@@ -4,7 +4,7 @@ DeepSeek Harness 的手机伴侣：对着电脑上的会话发消息、看流式
 不依赖中转也能连（局域网直连 / 公网直连 / 中转都是候选，谁先答话用谁）。
 
 - 插件端仓库：`xg-1-179/aidock`（基于 MIT 的 dsh-mobile-plugin 派生）
-- 安卓安装包：见 Releases，tag 形如 `apk-18`
+- 安卓安装包：见 Releases，最新：`apk-39` / `AIDock-217ac28.apk`
 
 ## 现在能做什么
 
