@@ -11,6 +11,30 @@ class DshHttpResponse {
   bool get ok => status >= 200 && status < 300;
 }
 
+/// 一条正在读的 SSE 响应。
+///
+/// 手机端拿到的会话流是 `text/event-stream`（不是 WebSocket）：先有响应头，然后一帧一帧
+/// 的 `data:` 行。这里只把它拆成「行」，SSE 记录与信封解码交给 [DshClient]。
+class DshEventStream {
+  DshEventStream(this.status, this.headers, this.lines, Future<void> Function() close)
+      : _close = close;
+
+  final int status;
+  final Map<String, String> headers;
+
+  /// 原始行（已按 `\n` 拆开，不含换行符）。
+  final Stream<String> lines;
+
+  final Future<void> Function() _close;
+
+  bool get ok => status >= 200 && status < 300;
+
+  /// 服务端协商出来的协议版本（`x-dsh-proto: 2` 表示帧是信封）。
+  String get proto => headers['x-dsh-proto'] ?? '';
+
+  Future<void> close() => _close();
+}
+
 /// 传输抽象：真机走 [IoDshTransport]，测试可以换成内存实现。
 abstract class DshTransport {
   Future<DshHttpResponse> send({
@@ -21,18 +45,14 @@ abstract class DshTransport {
     required String body,
   });
 
-  /// 打开一条 WebSocket；首帧之前要把 [headers] 带上去（签名头就在里面）。
-  Future<DshSocket> openSocket({
+  /// 打开一条 SSE 流：返回响应头 + 行流。请求头（签名 / 协议版本）必须原样带上。
+  Future<DshEventStream> openEventStream({
+    required String method,
     required String path,
     required String query,
     required Map<String, String> headers,
   });
 
-  Future<void> close();
-}
-
-abstract class DshSocket {
-  Stream<String> get frames;
   Future<void> close();
 }
 
@@ -68,32 +88,34 @@ class IoDshTransport implements DshTransport {
   }
 
   @override
-  Future<DshSocket> openSocket({
+  Future<DshEventStream> openEventStream({
+    required String method,
     required String path,
     required String query,
     required Map<String, String> headers,
   }) async {
-    final uri = _uri(path, query, scheme: baseUrl.scheme == 'https' ? 'wss' : 'ws');
-    final ws = await WebSocket.connect(uri.toString(), headers: headers)
-        .timeout(_timeout);
-    return _IoSocket(ws);
+    final uri = _uri(path, query);
+    final req = await _client.openUrl(method, uri).timeout(_timeout);
+    headers.forEach(req.headers.set);
+    req.headers.set(HttpHeaders.acceptHeader, 'text/event-stream');
+    // 心跳是 15 秒一帧，桌面那条路上还会有更长的静默；这里只限制「拿到响应头」的时间，
+    // 之后的读由流本身控制（否则一段安静的长回复会被判成超时）。
+    final res = await req.close().timeout(_timeout);
+    final head = <String, String>{};
+    res.headers.forEach((name, values) {
+      if (values.isNotEmpty) head[name.toLowerCase()] = values.first;
+    });
+    final lines = utf8.decoder.bind(res).transform(const LineSplitter());
+    return DshEventStream(res.statusCode, head, lines, () async {
+      try {
+        await res.detachSocket().then((s) => s.destroy());
+      } catch (_) {/* 已经断了 */}
+    });
   }
 
-  Uri _uri(String path, String query, {String? scheme}) => Uri.parse(
-        '${scheme ?? baseUrl.scheme}://${baseUrl.authority}$path$query',
-      );
+  Uri _uri(String path, String query) =>
+      Uri.parse('${baseUrl.scheme}://${baseUrl.authority}$path$query');
 
   @override
   Future<void> close() async => _client.close(force: true);
-}
-
-class _IoSocket implements DshSocket {
-  _IoSocket(this._ws);
-  final WebSocket _ws;
-
-  @override
-  Stream<String> get frames => _ws.map((e) => e is String ? e : utf8.decode(e as List<int>));
-
-  @override
-  Future<void> close() => _ws.close();
 }

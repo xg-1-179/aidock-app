@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show gzip;
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -210,47 +211,87 @@ class DshClient {
   Future<Map<String, dynamic>> stop(String sessionId) =>
       call('POST', '$_prefix/session/stop', payload: {'sessionId': sessionId});
 
-  /// 会话流：逐帧解密后交出。
+  /// 会话流：服务端是 SSE（`text/event-stream`），不是 WebSocket。
   ///
-  /// 帧可能是明文（传输层事件），也可能是 `{"v":2,"c":...}`；后者按
-  /// [DshClient._streamAads] 里的候选 AAD 依次尝试。
+  /// 每一帧要么是明文 JSON（服务端没开逐帧封装），要么是 `{"v":2,"n":…,"c":…}`
+  /// 信封。信封的 AAD 钉死了「路径 + 本次请求的 ts/nonce + 帧序号」：
+  /// `v2|down|sse|<path>|<ts>|<nonce>|<seq>`，序号从 1 起、宿主自己数。
   Stream<Map<String, dynamic>> stream(String sessionId) async* {
+    const path = '$_prefix/session/stream';
+    final query = '?sessionId=$sessionId';
     final env = await DshEnvelope.build(
       keys: keys,
       keyId: keyId,
       method: 'GET',
-      path: '$_prefix/session/stream',
-      query: '?sessionId=$sessionId',
+      path: path,
+      query: query,
       payload: const {},
     );
-    final socket = await transport.openSocket(
-      path: '$_prefix/session/stream',
-      query: '?sessionId=$sessionId',
+    final es = await transport.openEventStream(
+      method: 'GET',
+      path: path,
+      query: query,
       headers: env.headers,
     );
+    if (!es.ok) {
+      await es.close();
+      throw DshClientException('stream failed', status: es.status);
+    }
+    final buffer = StringBuffer();
+    var seq = 0;
     try {
-      await for (final frame in socket.frames) {
-        final json = jsonDecode(frame);
-        if (json is! Map<String, dynamic>) continue;
-        final c = json['c'];
-        if (c is! String) {
-          yield json;
+      await for (final line in es.lines) {
+        if (line.isEmpty) {
+          final raw = buffer.toString();
+          buffer.clear();
+          if (raw.isEmpty) continue;
+          final frame = await _openFrame(
+            raw,
+            path: path,
+            timestamp: env.timestamp,
+            nonce: env.nonce,
+            seq: ++seq,
+          );
+          if (frame != null) yield frame;
           continue;
         }
-        yield await _decode(
-          frame,
-          method: 'GET',
-          path: '$_prefix/session/stream',
-          env: env,
-          extraAads: [
-            'v2|stream|$sessionId',
-            'v2|down|GET|$_prefix/session/stream?sessionId=$sessionId|${env.timestamp}|${env.nonce}',
-          ],
-        );
+        // SSE 记录：`id:` / `retry:` / 注释行都不进消息模型，只有 `data:` 是正文。
+        if (line.startsWith('data:')) {
+          buffer.write(line.substring(5).trimLeft());
+        }
       }
     } finally {
-      await socket.close();
+      await es.close();
     }
+  }
+
+  /// 解一帧：`{v:2,n,c,z?}` → 明文 JSON；不是信封就只做 JSON 解析。
+  Future<Map<String, dynamic>?> _openFrame(
+    String raw, {
+    required String path,
+    required String timestamp,
+    required String nonce,
+    required int seq,
+  }) async {
+    final json = jsonDecode(raw);
+    if (json is! Map<String, dynamic>) return null;
+    final c = json['c'];
+    if (c is! String) return json;
+    final sealed = <int>[
+      ...(json['n'] is String
+          ? base64Url.decode(base64Url.normalize(json['n'] as String))
+          : const <int>[]),
+      ...base64.decode(c),
+    ];
+    final clear = await DshCrypto.open(
+      key: keys.down,
+      sealed: sealed,
+      aad: 'v2|down|sse|$path|$timestamp|$nonce|$seq',
+    );
+    // `z=g` 表示这段明文先压过（大帧才压）；不压的帧是原样 JSON。
+    final bytes = json['z'] == 'g' ? gzip.decode(clear) : clear;
+    final decoded = jsonDecode(utf8.decode(bytes));
+    return decoded is Map<String, dynamic> ? decoded : null;
   }
 
   static String _b64u(List<int> bytes) =>

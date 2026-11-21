@@ -61,15 +61,26 @@ class MockHost {
     }
 
     if (path == '/api/mobile/v1/session/stream') {
-      final ws = await WebSocketTransformer.upgrade(req);
+      // 会话流是 SSE：一帧一条 `data:`，帧信封的 AAD 钉着「路径 + 请求 ts/nonce + 帧序号」。
+      final ts = req.headers.value('x-dsh-ts') ?? '';
+      final nonce = req.headers.value('x-dsh-nonce') ?? '';
       final sealed = await DshCrypto.seal(
         key: _keys.down,
         nonce: DshCrypto.randomNonce(),
-      plaintext: utf8.encode(jsonEncode({'kind': 'assistant.delta', 'text': '你好'})),
-        aad: 'v2|stream|${req.uri.queryParameters['sessionId']}',
+        plaintext: utf8.encode(jsonEncode({'type': 'session/event', 'sessionId': 's1', 'event': {'type': 'assistant/chunk', 'data': {'chunk': {'type': 'text-delta', 'text': '你好'}}}})),
+        aad: 'v2|down|sse|$path|$ts|$nonce|1',
       );
-      ws.add(jsonEncode({'v': 2, 'n': base64Url.encode(sealed.sublist(0, 12)).replaceAll('=', ''), 'c': base64.encode(sealed.sublist(12))}));
-      await ws.close();
+      req.response.headers.contentType = ContentType('text', 'event-stream', charset: 'utf-8');
+      req.response.headers.set('x-dsh-proto', '2');
+      req.response.write(': connected\n\n');
+      req.response.write(
+        'retry: 3000\ndata: ${jsonEncode({
+          'v': 2,
+          'n': base64Url.encode(sealed.sublist(0, 12)).replaceAll('=', ''),
+          'c': base64.encode(sealed.sublist(12)),
+        })}\n\n',
+      );
+      await req.response.close();
       return;
     }
 
@@ -183,9 +194,12 @@ void main() {
     expect(e.toString(), contains('HTTP 401'));
   });
 
-  test('流式帧能按 v2|stream 解密', () async {
+  test('SSE 帧按 v2|down|sse 解密', () async {
     final frames = await client.stream('s1').toList();
     expect(frames, hasLength(1));
-    expect(frames.first['text'], '你好');
+    final event = frames.first['event'] as Map<String, dynamic>;
+    expect(event['type'], 'assistant/chunk');
+    final chunk = (event['data'] as Map<String, dynamic>)['chunk'] as Map<String, dynamic>;
+    expect(chunk['text'], '你好');
   });
 }
