@@ -10,6 +10,9 @@
 - [x] 公网直连口用探针跑通：配对 → 列表（358 条）→ 新建会话 → 发消息 → 流式 70 帧（`~/.dsh/t_e2e.mjs`）
 - [x] 授权链路：配对回包的 `sealed` 解出 `token`/`deviceCredential`，后续每请求带
       `Authorization: Bearer` + `X-Dsh-Device-Credential`（`test('配对后每个请求都带上 paired 的授权头')`）
+- [x] 凭据有效期实测 `credentialExpiresAt` = 现在 + 8760 小时（一年），权限十项全给
+      （`view/files.read/input/dispatch/approve/operate/files.write/transfer/manage/config`）
+- [x] 凭据过期不再无限重连：流上出现 401/403 直接停表并提示「断开后用六位码重新连一次」
 - [ ] 真机对真宿主：审批卡片点「允许一次/拒绝/以后都同意」（需人工，见第四节）
 
 ## 二、安卓打包（自动化 + 人工核对 manifest）
