@@ -13,6 +13,7 @@ class MockHost {
   late Uint8List _deviceKey;
   late DshSessionKeys _keys;
   final List<String> seenPaths = [];
+  final List<Map<String, String>> seenHeaders = [];
 
   Uint8List get ticket => _ticket;
   String get instanceId => _instanceId;
@@ -32,6 +33,7 @@ class MockHost {
     final body = await utf8.decoder.bind(req).join();
     final path = req.uri.path;
     seenPaths.add('${req.method} $path' + (req.uri.query.isEmpty ? '' : '?${req.uri.query}'));
+    seenHeaders.add({for (final h in req.headers.keys) h: '${req.headers.value(h)}'});
 
     if (path == '/api/mobile/v1/pair') {
       final pairKey = await DshCrypto.pairKey(_ticket, _instanceId);
@@ -45,7 +47,22 @@ class MockHost {
       _deviceKey = Uint8List.fromList(
           base64Url.decode(base64Url.normalize(dev['deviceKey'] as String)));
       _keys = await DshCrypto.sessionKeys(_deviceKey);
-      _json(req, {'ok': true, 'proto': 2});
+      // 和真宿主一样：授权封在 sealed 里回来（token / deviceCredential / permissions）。
+      final grant = await DshCrypto.seal(
+        key: pairKey,
+        nonce: DshCrypto.randomNonce(),
+        plaintext: utf8.encode(jsonEncode({
+          'token': 'tok-123',
+          'deviceCredential': 'cred-abc',
+          'permissions': ['view', 'input'],
+        })),
+        aad: 'pair|v2|$_instanceId',
+      );
+      _json(req, {
+        'ok': true,
+        'proto': 2,
+        'sealed': base64Url.encode(grant).replaceAll('=', ''),
+      });
       return;
     }
 
@@ -196,6 +213,23 @@ void main() {
 
   test('配对后能探活（明文响应）', () async {
     expect((await client.health())['service'], 'mock');
+  });
+
+  test('配对后每个请求都带上 paired 的授权头', () async {
+    final t = IoDshTransport(host.baseUrl);
+    final r = await DshClient.pair(
+      baseUrl: host.baseUrl,
+      transport: t,
+      ticket: host.ticket,
+      instanceId: host.instanceId,
+      deviceKey: Uint8List.fromList(List<int>.generate(32, (i) => 200 + i)),
+      keyId: 'aaaabbbbccccdddd',
+    );
+    expect(r.grant['token'], 'tok-123');
+    await r.client.sessions();
+    final last = host.seenHeaders.last;
+    expect(last['authorization'], 'Bearer tok-123');
+    expect(last['x-dsh-device-credential'], 'cred-abc');
   });
 
   test('会话列表能解密', () async {
