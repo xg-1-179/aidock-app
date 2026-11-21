@@ -13,7 +13,7 @@ class PairPage extends StatefulWidget {
 }
 
 class _PairPageState extends State<PairPage> {
-  final _host = TextEditingController(text: '101.43.213.201:41873');
+  final _host = TextEditingController();
   final _code = TextEditingController();
   final _codeFocus = FocusNode();
 
@@ -85,7 +85,7 @@ class _PairPageState extends State<PairPage> {
                 keyboardType: TextInputType.url,
                 autocorrect: false,
                 decoration: const InputDecoration(
-                  hintText: '101.43.213.201:41873',
+                  hintText: '192.168.1.5:41873',
                   prefixIcon: Icon(Icons.dns_outlined, size: 20),
                 ),
               ),
