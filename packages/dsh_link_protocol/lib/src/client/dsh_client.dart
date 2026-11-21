@@ -51,6 +51,7 @@ class DshClient {
     required String keyId,
     String deviceName = 'AIDock',
     String platform = 'android',
+    String? pairingCode,
   }) async {
     final pairKey = await DshCrypto.pairKey(ticket, instanceId);
     final aad = 'pair|v2|$instanceId';
@@ -65,7 +66,12 @@ class DshClient {
       plaintext: utf8.encode(jsonEncode(clear)),
       aad: aad,
     );
-    final body = jsonEncode({'instanceId': instanceId, 'sealed': _b64u(sealed)});
+    final body = jsonEncode(<String, dynamic>{
+      'instanceId': instanceId,
+      'sealed': _b64u(sealed),
+      // AIDock：面板上的六位连接码既是「口令」也是派生素材，宿主用它替代二维码票据。
+      if (pairingCode != null) 'code': pairingCode,
+    });
     final res = await transport.send(
       method: 'POST',
       path: '$_prefix/pair',

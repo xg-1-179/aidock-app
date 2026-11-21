@@ -96,6 +96,7 @@ class AppState extends ChangeNotifier {
         instanceId: instanceId!,
         deviceKey: deviceKey,
         keyId: keyId,
+        pairingCode: code.trim(),
       );
       _client = result.client;
       paired = true;
