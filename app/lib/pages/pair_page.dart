@@ -27,9 +27,9 @@ class _PairPageState extends State<PairPage> {
   }
 
   /// 上次连过的电脑：省掉重新输地址和六位码（凭据过期会提示重新拿码）。
-  Widget _savedCard(AppState s) {
+  Widget _machinesCard(AppState s) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
       decoration: BoxDecoration(
         color: AidockColors.surface,
         borderRadius: BorderRadius.circular(14),
@@ -42,34 +42,45 @@ class _PairPageState extends State<PairPage> {
             children: [
               Icon(Icons.history_rounded, size: 18, color: AidockColors.accent),
               SizedBox(width: 8),
-              Text('上次连接的电脑',
+              Text('连过的电脑',
                   style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
             ],
           ),
-          const SizedBox(height: 6),
-          SelectableText(s.savedHost ?? '',
+          const SizedBox(height: 4),
+          for (final m in s.machines) _machineRow(s, m),
+        ],
+      ),
+    );
+  }
+
+  Widget _machineRow(AppState s, SavedMachine m) {
+    final when = m.lastAt == 0
+        ? ''
+        : DateTime.fromMillisecondsSinceEpoch(m.lastAt).toString().substring(0, 16);
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SelectableText(m.host,
               style: const TextStyle(
                   fontSize: 12, color: AidockColors.textDim, fontFamily: 'monospace')),
-          if ((s.savedPermissions ?? '').isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text('权限：${s.savedPermissions}',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11, color: AidockColors.textDim, height: 1.4)),
-          ],
-          const SizedBox(height: 8),
+          if (when.isNotEmpty)
+            Text('上次连接 $when',
+                style: const TextStyle(fontSize: 10.5, color: AidockColors.textDim)),
+          const SizedBox(height: 6),
           Row(
             children: [
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: s.busy ? null : () => s.reconnectSaved(),
+                  onPressed: s.busy ? null : () => s.reconnectSaved(m),
                   icon: const Icon(Icons.bolt_rounded, size: 18),
-                  label: const Text('直接连接'),
+                  label: const Text('连接这台'),
                 ),
               ),
               const SizedBox(width: 8),
               TextButton(
-                onPressed: s.busy ? null : () => s.forgetSaved(),
+                onPressed: s.busy ? null : () => s.forgetSaved(m),
                 child: const Text('忘掉'),
               ),
             ],
@@ -79,7 +90,6 @@ class _PairPageState extends State<PairPage> {
     );
   }
 
-  /// 扫二维码：把地址与六位码一起填好并直接连，省掉手输。
   Future<void> _scan() async {
     final link = await Navigator.of(context).push<ScannedLink>(
       MaterialPageRoute(builder: (_) => const ScanPage()),
@@ -136,7 +146,7 @@ class _PairPageState extends State<PairPage> {
               ),
               const SizedBox(height: 34),
               if (s.hasSaved) ...[
-                _savedCard(s),
+                _machinesCard(s),
                 const SizedBox(height: 20),
               ],
               const Text('连接这台电脑',

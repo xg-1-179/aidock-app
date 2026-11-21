@@ -56,6 +56,57 @@ class QuestionCard {
   final List<QuestionItem> questions;
 }
 
+/// 一台连过的电脑。手机里存的是「再回去一次」所需的最小凭据集合：
+/// 主机地址、设备私钥、keyId、实例号、授权 token 与设备凭据。
+class SavedMachine {
+  SavedMachine({
+    required this.host,
+    required this.deviceKeyB64,
+    required this.keyId,
+    required this.instanceId,
+    required this.token,
+    required this.credential,
+    this.permissions = '',
+    this.lastAt = 0,
+  });
+
+  final String host;
+  final String deviceKeyB64;
+  final String keyId;
+  final String instanceId;
+  final String token;
+  final String credential;
+  final String permissions;
+  int lastAt;
+
+  Map<String, dynamic> toJson() => {
+        'host': host,
+        'key': deviceKeyB64,
+        'keyId': keyId,
+        'instanceId': instanceId,
+        'token': token,
+        'credential': credential,
+        'permissions': permissions,
+        'lastAt': lastAt,
+      };
+
+  static SavedMachine? fromJson(Object? raw) {
+    if (raw is! Map) return null;
+    final host = '${raw['host'] ?? ''}';
+    if (host.isEmpty) return null;
+    return SavedMachine(
+      host: host,
+      deviceKeyB64: '${raw['key'] ?? ''}',
+      keyId: '${raw['keyId'] ?? ''}',
+      instanceId: '${raw['instanceId'] ?? ''}',
+      token: '${raw['token'] ?? ''}',
+      credential: '${raw['credential'] ?? ''}',
+      permissions: '${raw['permissions'] ?? ''}',
+      lastAt: raw['lastAt'] is int ? raw['lastAt'] as int : 0,
+    );
+  }
+}
+
 class SessionItem {
   SessionItem({
     required this.id,
@@ -129,10 +180,14 @@ class AppState extends ChangeNotifier {
   static const String _kToken = 'aidock.token';
   static const String _kCredential = 'aidock.deviceCredential';
   static const String _kPerms = 'aidock.permissions';
+  static const String _kMachines = 'aidock.machines';
 
   String? savedHost;
   String? savedPermissions;
-  bool get hasSaved => (savedHost ?? '').isNotEmpty;
+  bool get hasSaved => machines.isNotEmpty;
+
+  /// 连过的电脑（最近连的排最前）。
+  final List<SavedMachine> machines = [];
 
   /// 上一次多路探测的结果（连接诊断用）：每条是 `地址 → 成功/失败原因`。
   final List<String> probeLog = [];
@@ -215,12 +270,52 @@ class AppState extends ChangeNotifier {
   Future<void> loadSaved() async {
     try {
       final p = await SharedPreferences.getInstance();
-      savedHost = p.getString(_kHost);
-      savedPermissions = p.getString(_kPerms);
+      machines.clear();
+      final raw = p.getString(_kMachines);
+      if (raw != null && raw.isNotEmpty) {
+        final list = jsonDecode(raw);
+        if (list is List) {
+          for (final item in list) {
+            final m = SavedMachine.fromJson(item);
+            if (m != null) machines.add(m);
+          }
+        }
+      }
+      // 老版本只存了一台（散键），迁进来后删掉旧的键。
+      final legacyHost = p.getString(_kHost);
+      if (machines.isEmpty && legacyHost != null && legacyHost.isNotEmpty) {
+        final migrated = SavedMachine(
+          host: legacyHost,
+          deviceKeyB64: p.getString(_kDeviceKey) ?? '',
+          keyId: p.getString(_kKeyId) ?? '',
+          instanceId: p.getString(_kInstance) ?? '',
+          token: p.getString(_kToken) ?? '',
+          credential: p.getString(_kCredential) ?? '',
+          permissions: p.getString(_kPerms) ?? '',
+        );
+        machines.add(migrated);
+        await _persistMachines();
+      }
+      machines.sort((a, b) => b.lastAt.compareTo(a.lastAt));
+      savedHost = machines.isEmpty ? null : machines.first.host;
+      savedPermissions = machines.isEmpty ? null : machines.first.permissions;
       notifyListeners();
     } catch (_) {
       // 存储不可用不该挡住输入六位码这条路。
     }
+  }
+
+  Future<void> _persistMachines() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setString(
+        _kMachines,
+        jsonEncode(machines.map((m) => m.toJson()).toList()),
+      );
+      for (final k in [_kHost, _kDeviceKey, _kKeyId, _kInstance, _kToken, _kCredential, _kPerms]) {
+        await p.remove(k);
+      }
+    } catch (_) {}
   }
 
   Future<void> _rememberDevice({
@@ -236,49 +331,49 @@ class AppState extends ChangeNotifier {
     final perms = grant['permissions'] is List ? (grant['permissions'] as List).join(',') : '';
     savedHost = host;
     savedPermissions = perms;
-    try {
-      final p = await SharedPreferences.getInstance();
-      await p.setString(_kHost, host);
-      await p.setString(_kDeviceKey, base64Url.encode(deviceKey).replaceAll('=', ''));
-      await p.setString(_kKeyId, keyId);
-      await p.setString(_kInstance, instanceId);
-      await p.setString(_kToken, token);
-      await p.setString(_kCredential, credential);
-      await p.setString(_kPerms, perms);
-    } catch (_) {}
+    final machine = SavedMachine(
+      host: host,
+      deviceKeyB64: base64Url.encode(deviceKey).replaceAll('=', ''),
+      keyId: keyId,
+      instanceId: instanceId,
+      token: token,
+      credential: credential,
+      permissions: perms,
+      lastAt: DateTime.now().millisecondsSinceEpoch,
+    );
+    machines.removeWhere((m) => m.host == host);
+    machines.insert(0, machine);
+    await _persistMachines();
   }
 
-  Future<void> forgetSaved() async {
-    savedHost = null;
-    savedPermissions = null;
-    try {
-      final p = await SharedPreferences.getInstance();
-      for (final k in [_kHost, _kDeviceKey, _kKeyId, _kInstance, _kToken, _kCredential, _kPerms]) {
-        await p.remove(k);
-      }
-    } catch (_) {}
+  /// 忘掉一台电脑（不传就忘掉最近那台）。只删本地记录，不动电脑上的设备授权。
+  Future<void> forgetSaved([SavedMachine? machine]) async {
+    final target = machine ?? (machines.isEmpty ? null : machines.first);
+    if (target != null) machines.removeWhere((m) => m.host == target.host);
+    savedHost = machines.isEmpty ? null : machines.first.host;
+    savedPermissions = machines.isEmpty ? null : machines.first.permissions;
+    await _persistMachines();
     notifyListeners();
   }
 
   /// 用手机里存的凭据直接回去，不扫码不输六位码。
   /// 失败点很明确：凭据过期（401）→ 让用户重新拿码；连不上 → 报连接错误。
-  Future<void> reconnectSaved() async {
-    final host = savedHost;
-    if (host == null || host.isEmpty) return;
+  Future<void> reconnectSaved([SavedMachine? machine]) async {
+    final target = machine ?? (machines.isEmpty ? null : machines.first);
+    if (target == null) return;
     busy = true;
     error = null;
     notifyListeners();
     try {
-      final p = await SharedPreferences.getInstance();
-      final keyB64 = p.getString(_kDeviceKey) ?? '';
-      final keyId = p.getString(_kKeyId) ?? '';
-      final instance = p.getString(_kInstance) ?? '';
-      final token = p.getString(_kToken) ?? '';
-      final credential = p.getString(_kCredential) ?? '';
+      final keyB64 = target.deviceKeyB64;
+      final keyId = target.keyId;
+      final instance = target.instanceId;
+      final token = target.token;
+      final credential = target.credential;
       if (keyB64.isEmpty || keyId.isEmpty) {
         throw const FormatException('本地凭据不完整，请用六位码重连一次');
       }
-      final base = Uri.parse(host);
+      final base = Uri.parse(target.host);
       final transport = IoDshTransport(base);
       _transport?.close();
       _transport = transport;
