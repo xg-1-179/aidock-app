@@ -1,4 +1,4 @@
-"""Release APK 必需的两项：INTERNET 权限 + 明文 HTTP 放行。
+"""Release APK 必需的三项：INTERNET 权限 + 明文 HTTP 放行 + 桌面显示名。
 
 flutter create 生成的 main manifest 既没有 INTERNET（它只写进 debug/profile），
 也没有 usesCleartextTraffic，而 AIDock 直连的是 http://<ip>:<port>，
@@ -24,6 +24,10 @@ def main() -> int:
             1,
         )
         changed.append("INTERNET")
+
+    if 'android:label="aidock"' in s:
+        s = s.replace('android:label="aidock"', 'android:label="AIDock"', 1)
+        changed.append("label")
 
     if "usesCleartextTraffic" not in s:
         s = s.replace(
