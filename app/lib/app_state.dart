@@ -536,6 +536,10 @@ class AppState extends ChangeNotifier {
       _onFrame(frame);
     }, onError: (Object e) {
       streamingNow = false;
+      if (_isAuthError(e)) {
+        _stopForAuth();
+        return;
+      }
       _scheduleReconnect(c, sessionId, '$e');
     }, onDone: () {
       streamingNow = false;
@@ -552,8 +556,34 @@ class AppState extends ChangeNotifier {
     });
   }
 
+  /// 401/403 不是「网断了」，重试一万次也不会好：直接把话说明白，让用户去重连。
+  static bool _isAuthError(Object e) {
+    if (e is DshClientException) {
+      return e.status == 401 || e.status == 403;
+    }
+    final text = '$e';
+    return text.contains('401') || text.contains('403');
+  }
+
+  void _stopForAuth() {
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    _watchdog?.cancel();
+    _watchdog = null;
+    _sub?.cancel();
+    _sub = null;
+    reconnecting = false;
+    streamingNow = false;
+    error = '登录凭据过期了：断开后用六位码重新连一次';
+    notifyListeners();
+  }
+
   void _scheduleReconnect(DshClient c, String sessionId, String reason) {
     if (openSessionId != sessionId) return;
+    if (_isAuthError(reason)) {
+      _stopForAuth();
+      return;
+    }
     _retryTimer?.cancel();
     reconnecting = true;
     streamingNow = false;
@@ -568,6 +598,10 @@ class AppState extends ChangeNotifier {
         _attachStream(c, sessionId);
       } catch (e) {
         if (openSessionId != sessionId) return;
+        if (_isAuthError(e)) {
+          _stopForAuth();
+          return;
+        }
         _scheduleReconnect(c, sessionId, '$e');
       }
     });
