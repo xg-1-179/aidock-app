@@ -143,12 +143,18 @@ class DshClient {
     if (json is! Map<String, dynamic>) {
       throw DshClientException('unexpected body shape');
     }
-    final c = json['c'];
+    // §8.5：列表类响应把元数据留在外层、正文塞进 `env` 信封
+    // （`{ok, revision, generatedAt, env:{v,n,c}}`）。外层本身不是信封，
+    // 所以这里要认出 `env` 并把里面那层按同样的下行 AAD 解开，再与元数据合并。
+    final inner = json['env'];
+    final Map<String, dynamic>? sealedWire = inner is Map<String, dynamic> ? inner : null;
+    final wire = sealedWire ?? json;
+    final c = wire['c'];
     if (c is! String) return json; // 明文响应（health/status 之类）
     // 下行信封的形状是 `{n, c, z?}`：`n` 是 base64url 的 nonce，`c` 是 base64 的密文+tag。
     // 两者必须拼回 `nonce||ct||tag` 才能解 —— 只取 `c` 会一直 AEAD 认证失败（实测）。
     final sealedBytes = <int>[
-      ...(json['n'] is String ? base64Url.decode(base64Url.normalize(json['n'] as String)) : const <int>[]),
+      ...(wire['n'] is String ? base64Url.decode(base64Url.normalize(wire['n'] as String)) : const <int>[]),
       ...base64.decode(c),
     ];
     final aads = <String>[
@@ -163,7 +169,12 @@ class DshClient {
           sealed: sealedBytes,
           aad: aad,
         );
-        return jsonDecode(utf8.decode(clear)) as Map<String, dynamic>;
+        final decoded = jsonDecode(utf8.decode(clear)) as Map<String, dynamic>;
+        if (sealedWire == null) return decoded;
+        // 外层只留能给的元数据（ok / revision / generatedAt），正文在 env 里。
+        final merged = <String, dynamic>{...json, ...decoded};
+        merged.remove('env');
+        return merged;
       } catch (e) {
         last = e;
       }
