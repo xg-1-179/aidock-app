@@ -202,7 +202,7 @@ class _ChatPageState extends State<ChatPage> {
               builder: (context, _) {
                 WidgetsBinding.instance.addPostFrameCallback((_) => _toBottom());
                 final cards = s.approvals;
-                if (s.messages.isEmpty && cards.isEmpty) {
+                if (s.messages.isEmpty && cards.isEmpty && s.questions.isEmpty) {
                   return const Center(
                     child: Text('说点什么…', style: TextStyle(color: AidockColors.textDim, fontSize: 13)),
                   );
@@ -212,6 +212,7 @@ class _ChatPageState extends State<ChatPage> {
                   padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
                   children: [
                     for (final m in s.messages) _bubble(m),
+                    for (final q in s.questions) _QuestionDock(state: s, card: q),
                     for (final card in cards) _approval(card),
                   ],
                 );
@@ -449,5 +450,175 @@ class _ChatPageState extends State<ChatPage> {
     }
     if (at < text.length) spans.add(TextSpan(text: text.substring(at)));
     return spans;
+  }
+}
+
+/// 提问卡（宿主 `ask_user_question`）：单选题点一下即选，多选题可反选；
+/// 有选项时也可以补充自由输入，没选项时只填输入框。答复走 `/link/question/respond`。
+class _QuestionDock extends StatefulWidget {
+  const _QuestionDock({required this.state, required this.card});
+
+  final AppState state;
+  final QuestionCard card;
+
+  @override
+  State<_QuestionDock> createState() => _QuestionDockState();
+}
+
+class _QuestionDockState extends State<_QuestionDock> {
+  final Map<String, Set<String>> _picks = <String, Set<String>>{};
+  final Map<String, TextEditingController> _customs = <String, TextEditingController>{};
+  bool _sending = false;
+
+  @override
+  void dispose() {
+    for (final c in _customs.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  TextEditingController _customOf(String id) =>
+      _customs.putIfAbsent(id, () => TextEditingController());
+
+  Set<String> _picksOf(String id) => _picks.putIfAbsent(id, () => <String>{});
+
+  void _toggle(QuestionItem q, String label) {
+    final set = _picksOf(q.id);
+    setState(() {
+      if (q.multiSelect) {
+        if (!set.remove(label)) set.add(label);
+      } else {
+        set
+          ..clear()
+          ..add(label);
+      }
+    });
+  }
+
+  Future<void> _submit() async {
+    if (_sending) return;
+    setState(() => _sending = true);
+    final customs = <String, String>{
+      for (final q in widget.card.questions)
+        if ((_customs[q.id]?.text ?? '').trim().isNotEmpty) q.id: _customs[q.id]!.text.trim(),
+    };
+    await widget.state.answerQuestion(widget.card, _picks, customs: customs);
+    if (mounted) setState(() => _sending = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final card = widget.card;
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+      decoration: BoxDecoration(
+        color: AidockColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AidockColors.accent.withOpacity(0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.help_outline, size: 16, color: AidockColors.accent),
+              SizedBox(width: 7),
+              Expanded(
+                child: Text('电脑在等你回答',
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AidockColors.text)),
+              ),
+            ],
+          ),
+          for (final q in card.questions) _question(q),
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                FilledButton(
+                  onPressed: _sending ? null : _submit,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AidockColors.accent,
+                    foregroundColor: const Color(0xFF06121F),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  child: Text(_sending ? '提交中…' : '提交回答', style: const TextStyle(fontSize: 13)),
+                ),
+                if (_QuestionDockState.q_tip(card).isNotEmpty)
+                  Text(_QuestionDockState.q_tip(card),
+                      style: const TextStyle(fontSize: 11.5, color: AidockColors.textDim)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String q_tip(QuestionCard card) =>
+      card.questions.any((q) => q.multiSelect) ? '多选题可选多项' : '';
+
+  Widget _question(QuestionItem q) {
+    final picks = _picksOf(q.id);
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if ((q.header ?? '').isNotEmpty)
+            Text(q.header!,
+                style: const TextStyle(fontSize: 11.5, color: AidockColors.textDim, letterSpacing: 0.4)),
+          if ((q.header ?? '').isNotEmpty) const SizedBox(height: 3),
+          Text(q.text,
+              style: const TextStyle(fontSize: 13, height: 1.5, color: AidockColors.text)),
+          if ((q.detail ?? '').isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 5),
+              child: Text(q.detail!,
+                  style: const TextStyle(fontSize: 12, height: 1.5, color: AidockColors.textDim)),
+            ),
+          if (q.options.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  for (final o in q.options)
+                    ChoiceChip(
+                      label: Text(o.label, style: const TextStyle(fontSize: 12.5)),
+                      selected: picks.contains(o.label),
+                      onSelected: (_) => _toggle(q, o.label),
+                      backgroundColor: AidockColors.bg,
+                      selectedColor: AidockColors.accent.withOpacity(0.22),
+                      labelStyle: const TextStyle(color: AidockColors.text),
+                      side: BorderSide(
+                          color: picks.contains(o.label) ? AidockColors.accent : AidockColors.line),
+                      visualDensity: VisualDensity.compact,
+                      tooltip: o.description,
+                    ),
+                ],
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: TextField(
+              controller: _customOf(q.id),
+              minLines: 1,
+              maxLines: 3,
+              style: const TextStyle(fontSize: 13, color: AidockColors.text),
+              decoration: InputDecoration(
+                hintText: q.options.isEmpty ? '在这里回答…' : '或者自己写一个答案（可选）',
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

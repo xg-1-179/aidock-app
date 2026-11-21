@@ -14,6 +14,39 @@ class ChatMessage {
   bool streaming;
 }
 
+/// 选项：宿主给 `{label, description?}`，老形态可能只给字符串。
+class QuestionOption {
+  const QuestionOption({required this.label, this.description});
+  final String label;
+  final String? description;
+}
+
+/// 一道题。`options` 为空表示自由作答（只填 `custom`）。
+class QuestionItem {
+  const QuestionItem({
+    required this.id,
+    required this.text,
+    this.header,
+    this.detail,
+    this.options = const <QuestionOption>[],
+    this.multiSelect = false,
+  });
+  final String id;
+  final String text;
+  final String? header;
+  final String? detail;
+  final List<QuestionOption> options;
+  final bool multiSelect;
+}
+
+/// 一张待回答的提问卡（`question/requested`）。
+class QuestionCard {
+  const QuestionCard({required this.rpcId, required this.sessionId, required this.questions});
+  final String rpcId;
+  final String sessionId;
+  final List<QuestionItem> questions;
+}
+
 class SessionItem {
   SessionItem({
     required this.id,
@@ -98,6 +131,8 @@ class AppState extends ChangeNotifier {
   final List<SessionItem> sessions = [];
   final List<ChatMessage> messages = [];
   final List<ApprovalCard> approvals = [];
+  /// 待回答的提问卡（同一条 rpcId 只留一张）。
+  final List<QuestionCard> questions = [];
 
   String? openSessionId;
   bool streamingNow = false;
@@ -554,6 +589,7 @@ class AppState extends ChangeNotifier {
     openSessionId = item.id;
     messages.clear();
     approvals.clear();
+    questions.clear();
     _seenIds.clear();
     notifyListeners();
     final c = _client;
@@ -722,6 +758,7 @@ class AppState extends ChangeNotifier {
     openSessionId = null;
     messages.clear();
     approvals.clear();
+    questions.clear();
     _seenIds.clear();
     streamingNow = false;
     notifyListeners();
@@ -789,6 +826,53 @@ class AppState extends ChangeNotifier {
           }
         }
         if (text.isNotEmpty) messages.add(ChatMessage(role: 'assistant', text: text));
+        break;
+      case 'question/requested':
+        final raw = inner['questions'] ?? payload['questions'];
+        final items = <QuestionItem>[];
+        if (raw is List) {
+          for (final q in raw) {
+            if (q is! Map) continue;
+            final id = '${q['id'] ?? ''}';
+            final text = '${q['question'] ?? ''}';
+            if (id.isEmpty || text.isEmpty) continue;
+            final opts = <QuestionOption>[];
+            final ro = q['options'];
+            if (ro is List) {
+              for (final o in ro) {
+                if (o is String && o.trim().isNotEmpty) {
+                  opts.add(QuestionOption(label: o.trim()));
+                } else if (o is Map) {
+                  final label = '${o['label'] ?? o['value'] ?? o['text'] ?? ''}'.trim();
+                  if (label.isEmpty) continue;
+                  final desc = '${o['description'] ?? ''}'.trim();
+                  opts.add(QuestionOption(label: label, description: desc.isEmpty ? null : desc));
+                }
+              }
+            }
+            items.add(QuestionItem(
+              id: id,
+              text: text,
+              header: q['header'] == null ? null : '${q['header']}',
+              detail: q['detail'] == null ? null : '${q['detail']}',
+              options: opts,
+              multiSelect: q['multiSelect'] == true,
+            ));
+          }
+        }
+        final qRpc = '${inner['rpcId'] ?? payload['rpcId'] ?? ''}';
+        if (qRpc.isNotEmpty && items.isNotEmpty) {
+          questions.removeWhere((e) => e.rpcId == qRpc);
+          questions.add(QuestionCard(
+            rpcId: qRpc,
+            sessionId: '${inner['sessionId'] ?? openSessionId ?? ''}',
+            questions: items,
+          ));
+        }
+        break;
+      case 'question/resolved':
+        final qid = '${inner['questionRpcId'] ?? payload['questionRpcId'] ?? inner['rpcId'] ?? ''}';
+        if (qid.isNotEmpty) questions.removeWhere((e) => e.rpcId == qid);
         break;
       case 'approval/requested':
         final card = ApprovalCard(
@@ -874,6 +958,34 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 提交提问卡的回答。`picks` 是「题 id → 选中的 label 列表」，`customs` 是自由输入。
+  Future<void> answerQuestion(
+    QuestionCard card,
+    Map<String, List<String>> picks, {
+    Map<String, String> customs = const <String, String>{},
+  }) async {
+    final c = _client;
+    if (c == null) return;
+    final answers = <Map<String, dynamic>>[
+      for (final q in card.questions)
+        <String, dynamic>{
+          'id': q.id,
+          'selected': (picks[q.id] ?? const <String>[]).toList(),
+          if ((customs[q.id] ?? '').trim().isNotEmpty) 'custom': customs[q.id]!.trim(),
+        },
+    ];
+    try {
+      await c.respondQuestion(rpcId: card.rpcId, sessionId: card.sessionId, answers: answers);
+      questions.removeWhere((e) => e.rpcId == card.rpcId);
+      error = null;
+    } on DshClientException catch (e) {
+      error = '提交回答失败：${e.message}';
+    } catch (e) {
+      error = '提交回答失败：$e';
+    }
+    notifyListeners();
+  }
+
   Future<void> send(String text) async {
     final c = _client;
     final sid = openSessionId;
@@ -925,6 +1037,7 @@ class AppState extends ChangeNotifier {
     sessions.clear();
     messages.clear();
     approvals.clear();
+    questions.clear();
     streamingNow = false;
     openSessionId = null;
     notifyListeners();
