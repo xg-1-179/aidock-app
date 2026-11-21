@@ -4,12 +4,38 @@ import '../app_state.dart';
 import '../theme.dart';
 import 'chat_page.dart';
 
-class SessionsPage extends StatelessWidget {
+class SessionsPage extends StatefulWidget {
   const SessionsPage({super.key, required this.state});
   final AppState state;
 
   @override
+  State<SessionsPage> createState() => _SessionsPageState();
+}
+
+class _SessionsPageState extends State<SessionsPage> {
+  final _q = TextEditingController();
+
+  @override
+  void dispose() {
+    _q.dispose();
+    super.dispose();
+  }
+
+  /// 本地过滤：电脑上常有几百个会话，滚不动也找不到；
+  /// 标题与第二行（最后一条消息 / 路径）都参与匹配。
+  List<SessionItem> _filtered(List<SessionItem> all) {
+    final q = _q.text.trim().toLowerCase();
+    if (q.isEmpty) return all;
+    return all
+        .where((e) =>
+            e.title.toLowerCase().contains(q) || e.subtitle.toLowerCase().contains(q))
+        .toList();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final state = widget.state;
+    final rows = _filtered(state.sessions);
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -58,34 +84,65 @@ class SessionsPage extends StatelessWidget {
         icon: const Icon(Icons.add_comment_rounded, size: 19),
         label: const Text('新建会话', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
       ),
-      body: RefreshIndicator(
-        onRefresh: state.refreshSessions,
-        color: AidockColors.accent,
-        backgroundColor: AidockColors.surface,
-        child: state.sessions.isEmpty
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+            child: TextField(
+              controller: _q,
+              onChanged: (_) => setState(() {}),
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: '搜索会话标题或路径',
+                prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                suffixIcon: _q.text.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: '清除',
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        onPressed: () => setState(() {
+                          _q.clear();
+                        }),
+                      ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: state.refreshSessions,
+              color: AidockColors.accent,
+              backgroundColor: AidockColors.surface,
+              child: rows.isEmpty
             ? ListView(
                 padding: const EdgeInsets.all(24),
                 children: [
                   const SizedBox(height: 90),
                   Icon(Icons.forum_outlined, size: 44, color: AidockColors.textDim.withOpacity(0.55)),
                   const SizedBox(height: 14),
-                  const Center(
-                    child: Text('电脑上还没有会话',
-                        style: TextStyle(color: AidockColors.textDim, fontSize: 13.5)),
+                  Center(
+                    child: Text(
+                        _q.text.trim().isEmpty
+                            ? '电脑上还没有会话'
+                            : '没有匹配「${_q.text.trim()}」的会话',
+                        style: const TextStyle(color: AidockColors.textDim, fontSize: 13.5)),
                   ),
                   const SizedBox(height: 6),
-                  const Center(
-                    child: Text('在电脑上新建一个会话再下拉刷新',
-                        style: TextStyle(color: AidockColors.textDim, fontSize: 12)),
+                  Center(
+                    child: Text(
+                        _q.text.trim().isEmpty
+                            ? '在电脑上新建一个会话再下拉刷新'
+                            : '换个关键词试试，或用右下角新建会话',
+                        style: const TextStyle(color: AidockColors.textDim, fontSize: 12)),
                   ),
                 ],
               )
             : ListView.separated(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
-                itemCount: state.sessions.length,
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 90),
+                itemCount: rows.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (context, i) {
-                  final s = state.sessions[i];
+                  final s = rows[i];
                   return Material(
                     color: AidockColors.surface,
                     borderRadius: BorderRadius.circular(15),
@@ -139,6 +196,9 @@ class SessionsPage extends StatelessWidget {
                   );
                 },
               ),
+            ),
+          ),
+        ],
       ),
     );
   }

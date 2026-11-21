@@ -15,6 +15,7 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> {
   final _input = TextEditingController();
   final _scroll = ScrollController();
+  int _seen = 0;
 
   @override
   void dispose() {
@@ -66,6 +67,16 @@ class _ChatPageState extends State<ChatPage> {
   @override
   Widget build(BuildContext context) {
     final s = widget.state;
+    // 消息变长（新消息或流式增量）就贴着底部走；用户往上翻历史时不动。
+    final seen = s.messages.fold<int>(0, (a, m) => a + m.text.length) + s.messages.length;
+    if (seen != _seen) {
+      _seen = seen;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_scroll.hasClients) return;
+        final near = _scroll.position.maxScrollExtent - _scroll.position.pixels;
+        if (near < 260) _toBottom();
+      });
+    }
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title, overflow: TextOverflow.ellipsis),
