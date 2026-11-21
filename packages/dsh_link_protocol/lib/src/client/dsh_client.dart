@@ -332,6 +332,24 @@ class DshClient {
         payload: {'sessionId': sessionId, 'text': text},
       );
 
+  /// 发送「内容块」消息（文本 + 图片等）。
+  ///
+  /// 宿主 `handleSend` 两种写法都认：`{sessionId, text}` 或 `{sessionId, content}`。
+  /// 带图时必须走 `content`，图片块形状为
+  /// `{type:'image', data:<base64>, mediaType:'image/jpeg', name?}`（宿主见 `data` 就内联，
+  /// 不再去找 `uploadId`）。宿主明文上限 8MB、线上 10.7MB，调用方要先把图压到 1MB 级。
+  Future<Map<String, dynamic>> sendContent(
+    String sessionId,
+    List<Map<String, dynamic>> content, {
+    bool fresh = false,
+  }) =>
+      call(
+        'POST',
+        '$_prefix/link/session/send',
+        query: fresh ? '?fresh=1' : '',
+        payload: {'sessionId': sessionId, 'content': content},
+      );
+
   /// 在电脑上新建一个会话。
   ///
   /// 宿主要求落点二者之一：`workspaceId`（已登记工作区）或 `cwd`（必须在某个已登记

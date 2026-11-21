@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:image_picker/image_picker.dart';
+
 import '../app_state.dart';
 import '../theme.dart';
 
@@ -119,6 +121,37 @@ class _ChatPageState extends State<ChatPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _pickImage() async {
+    final s = widget.state;
+    if (s.openSessionId == null) return;
+    try {
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 78,
+      );
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      await s.sendImage(
+        name: file.name.isEmpty ? 'image.jpg' : file.name,
+        mediaType: _mediaTypeOf(file.name),
+        bytes: bytes,
+      );
+    } catch (e) {
+      s.setError('选图失败：$e');
+    }
+  }
+
+  static String _mediaTypeOf(String name) {
+    final lower = name.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.gif')) return 'image/gif';
+    if (lower.endsWith('.heic')) return 'image/heic';
+    return 'image/jpeg';
   }
 
   void _send() {
@@ -242,7 +275,18 @@ class _ChatPageState extends State<ChatPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
+                  SizedBox(
+                    width: 42,
+                    height: 46,
+                    child: IconButton(
+                      tooltip: '发图片',
+                      onPressed: _pickImage,
+                      icon: const Icon(Icons.image_outlined, size: 22),
+                      color: AidockColors.muted,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
                   SizedBox(
                     width: 46,
                     height: 46,

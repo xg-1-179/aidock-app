@@ -1,7 +1,7 @@
 name: aidock
 description: AIDock 手机客户端（DeepSeek Harness 远程伴侣）
 publish_to: none
-version: 0.5.0+9
+version: 0.6.0+10
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -12,6 +12,7 @@ dependencies:
   dsh_link_protocol:
     path: ../packages/dsh_link_protocol
   mobile_scanner: ^5.2.3
+  image_picker: ^1.1.2
   shared_preferences: ^2.2.3
 
 dev_dependencies:

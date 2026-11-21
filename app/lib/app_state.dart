@@ -1008,6 +1008,55 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// 发一张图（可带一句正文）。
+  ///
+  /// 宿主只认 `content` 块数组；图片块 `data` 是 base64，`mediaType` 要可读（
+  /// `history-derive.js` 靠它决定下发形状），否则桌面端渲染不出图。
+  Future<void> sendImage({
+    required String name,
+    required String mediaType,
+    required List<int> bytes,
+    String text = '',
+  }) async {
+    final c = _client;
+    final sid = openSessionId;
+    if (c == null || sid == null) return;
+    if (messages.length == 1 &&
+        messages.first.role == 'system' &&
+        messages.first.text == '这个会话还没有消息') {
+      messages.clear();
+    }
+    final body = text.trim();
+    final content = <Map<String, dynamic>>[
+      if (body.isNotEmpty) {'type': 'text', 'text': body},
+      {
+        'type': 'image',
+        'data': base64Encode(bytes),
+        'mediaType': mediaType,
+        'name': name,
+      },
+    ];
+    messages.add(ChatMessage(
+      role: 'user',
+      text: body.isEmpty ? '（图片）$name' : '$body\n（图片）$name',
+    ));
+    streamingNow = true;
+    notifyListeners();
+    try {
+      await c.sendContent(sid, content);
+    } catch (e) {
+      streamingNow = false;
+      messages.add(ChatMessage(role: 'system', text: '发送失败：$e'));
+      notifyListeners();
+    }
+  }
+
+  /// UI 侧（选图失败等）把问题挂到同一条错误带上，避免各页自己维护一份。
+  void setError(String message) {
+    error = message;
+    notifyListeners();
+  }
+
   Future<void> stopTurn() async {
     final c = _client;
     final sid = openSessionId;
