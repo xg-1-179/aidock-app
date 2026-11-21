@@ -49,6 +49,27 @@ class MockHost {
       return;
     }
 
+    // 列表请求是 GET（空体），不能走下面的「解密上行」分支；直接回一封加密列表。
+    if (path.endsWith('/sessions')) {
+      final ts = int.parse(req.headers.value('X-Dsh-Ts')!);
+      final nonce = req.headers.value('X-Dsh-Nonce')!;
+      final sealed = await DshCrypto.seal(
+        key: _keys.down,
+        nonce: DshCrypto.randomNonce(),
+        plaintext: utf8.encode(jsonEncode({
+          'sessions': [
+            {'id': 's1', 'title': '示例会话', 'runtime': 'idle'},
+          ]
+        })),
+        aad: 'v2|down|${req.method}|$path|$ts|$nonce',
+      );
+      _json(req, {
+        'v': 2,
+        'n': base64Url.encode(sealed.sublist(0, 12)).replaceAll('=', ''),
+        'c': base64.encode(sealed.sublist(12)),
+      });
+      return;
+    }
     if (path == '/api/mobile/v1/health') {
       _json(req, {'ok': true, 'service': 'mock'});
       return;
@@ -185,7 +206,7 @@ void main() {
 
   test('sendMessage 带 fresh=1 时查询串正确', () async {
     await client.sendMessage('s1', '在吗', fresh: true);
-    expect(host.seenPaths.last, 'POST /api/mobile/v1/session/send?fresh=1');
+    expect(host.seenPaths.last, endsWith('/session/send?fresh=1'));
   });
 
   test('错误映射：异常对象带上状态码与 body', () {

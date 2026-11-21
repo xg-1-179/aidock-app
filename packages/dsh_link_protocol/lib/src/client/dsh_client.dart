@@ -139,7 +139,13 @@ class DshClient {
     required DshEnvelope env,
     List<String> extraAads = const [],
   }) async {
-    final json = jsonDecode(body);
+    final dynamic json;
+    try {
+      json = jsonDecode(body);
+    } catch (_) {
+      // 空体或非 JSON（网关页、401 不带体）：按状态码抛，而不是让 FormatException 冒上去。
+      throw DshClientException('响应不是 JSON（HTTP $status）', status: res.status, body: body);
+    }
     if (json is! Map<String, dynamic>) {
       throw DshClientException('unexpected body shape');
     }
@@ -192,7 +198,11 @@ class DshClient {
       body: '',
     );
     if (!res.ok) throw DshClientException('health failed', status: res.status, body: res.body);
-    return jsonDecode(res.body) as Map<String, dynamic>;
+    try {
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {
+      throw DshClientException('响应不是 JSON（HTTP ${res.status}）', status: res.status, body: res.body);
+    }
   }
 
   /// 会话列表。
