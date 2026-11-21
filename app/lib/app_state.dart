@@ -169,7 +169,9 @@ class AppState extends ChangeNotifier {
           try {
             final r = await t.send(
               method: 'GET',
-              path: '/api/mobile/v1/link/info',
+              // 探活打 `/health`：它是唯一在公网监听口上无条件放行的端点
+              // （配对前的 `/link/info` 要等宿主重启后才免鉴权，探活不能依赖它）。
+              path: '/api/mobile/v1/health',
               query: '',
               headers: const {},
               body: '',
@@ -197,17 +199,33 @@ class AppState extends ChangeNotifier {
       _transport?.close();
       final transport = IoDshTransport(base);
       _transport = transport;
-      final info = await transport.send(
+      var info = await transport.send(
         method: 'GET',
         path: '/api/mobile/v1/link/info',
         query: '',
         headers: const {},
         body: '',
       );
-      if (!info.ok) {
-        throw DshClientException('电脑没有响应', status: info.status, body: info.body);
+      Map<String, dynamic> meta = const {};
+      if (info.ok) {
+        final decoded = jsonDecode(info.body);
+        if (decoded is Map<String, dynamic>) meta = decoded;
       }
-      final meta = jsonDecode(info.body) as Map<String, dynamic>;
+      if (meta['ok'] != true) {
+        // 回落：`/health` 也带 instanceId，公网口上它一定放行。
+        info = await transport.send(
+          method: 'GET',
+          path: '/api/mobile/v1/health',
+          query: '',
+          headers: const {},
+          body: '',
+        );
+        if (!info.ok) {
+          throw DshClientException('电脑没有响应', status: info.status, body: info.body);
+        }
+        final decoded = jsonDecode(info.body);
+        meta = decoded is Map<String, dynamic> ? decoded : const {};
+      }
       if (meta['ok'] != true) {
         throw DshClientException('${meta['error'] ?? '电脑没有就绪'}');
       }

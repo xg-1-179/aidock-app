@@ -186,7 +186,10 @@ class DshClient {
 
   /// 会话列表。
   Future<List<Map<String, dynamic>>> sessions({String query = ''}) async {
-    final r = await call('GET', '$_prefix/sessions', query: query);
+    // AIDock 宿主把会话清单与历史挂在自己的别名路径上（`link/` 前缀），
+    // 这两条与旧的 `/sessions`、`/session/messages` 是同一份实现，只是后者在插件的
+    // 热重载里换不掉（旧 handler 先注册先命中），别名路径没有这个问题。
+    final r = await call('GET', '$_prefix/link/sessions', query: query);
     final list = r['sessions'] ?? r['items'] ?? r['data'];
     if (list is List) {
       return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
@@ -205,7 +208,7 @@ class DshClient {
       ..write('&limit=$limit');
     if (beforeSeq != null) q.write('&beforeSeq=$beforeSeq');
     if (thin && beforeSeq == null) q.write('&thin=1');
-    final r = await call('GET', '$_prefix/session/messages', query: q.toString());
+    final r = await call('GET', '$_prefix/link/messages', query: q.toString());
     final list = r['messages'] ?? r['items'] ?? r['data'];
     if (list is List) {
       return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();

@@ -125,7 +125,7 @@ class MockHost {
     // 签名口径已在 vectors_test 用官方向量锁死；这里只做旁证，不阻塞集成用例。
     if (!verified) print('warn: 签名旁证失败（bodyHash 口径差异）');
 
-    final out = path == '/api/mobile/v1/sessions'
+    final out = (path == '/api/mobile/v1/sessions' || path == '/api/mobile/v1/link/sessions')
         ? {
             'sessions': [
               {'id': 's1', 'title': '示例会话', 'runtime': 'idle'},
