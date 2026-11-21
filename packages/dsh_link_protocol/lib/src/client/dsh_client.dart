@@ -70,8 +70,6 @@ class DshClient {
     final body = jsonEncode(<String, dynamic>{
       'instanceId': instanceId,
       'sealed': _b64u(sealed),
-      // AIDock：面板上的六位连接码既是「口令」也是派生素材，宿主用它替代二维码票据。
-      if (pairingCode != null) 'code': pairingCode,
     });
     final res = await transport.send(
       method: 'POST',
