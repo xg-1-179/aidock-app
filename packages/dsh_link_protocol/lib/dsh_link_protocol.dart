@@ -6,3 +6,6 @@ export 'src/envelope.dart';
 export 'src/connect/candidate.dart';
 export 'src/connect/path_memory.dart';
 export 'src/connect/probe.dart';
+
+export 'src/client/transport.dart';
+export 'src/client/dsh_client.dart';
