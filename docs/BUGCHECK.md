@@ -7,7 +7,8 @@
 - [x] 官方 9 项 e2ee 向量全过（`packages/dsh_link_protocol/test/vectors_test.dart`）
 - [x] 连接探测 7 项（先到先用 / 超时判负 / 全失败 / 路径记忆）
 - [x] 客户端 MockHost 5 项（配对、列表解密、fresh 查询串、异常映射、SSE 帧）
-- [ ] 真机对真宿主：配对 → 列表 → 发消息 → 流式 → 审批（需人工，见第四节）
+- [x] 公网直连口用探针跑通：配对 → 列表（358 条）→ 新建会话 → 发消息 → 流式 70 帧（`~/.dsh/t_e2e.mjs`）
+- [ ] 真机对真宿主：审批卡片点「允许一次/拒绝/以后都同意」（需人工，见第四节）
 
 ## 二、安卓打包（自动化 + 人工核对 manifest）
 
@@ -41,13 +42,13 @@
 - [x] `node --check`：`lib/routes/mobile-api.js`、`lib/routes/aidock-panel.js`、
       `lib/relay/lan-proxy.js`、`lib/impl.js`
 - [x] 面板渲染冒烟：`panelPayload()` 字段齐全、`renderPanel()` 含码与地址
-- [ ] 41873 公网端口：`/link/info`、`/link/panel`、`POST /link/pair` 免鉴权放行
-- [ ] `/link/code`、`/link/panel` 只允许本机访问（非 loopback 应 403）
-- [ ] 连接码 10 分钟轮换、面板自动续期
-- [ ] 重启宿主后 `/api/mobile/v1/sessions` 不再 500
+- [x] 41873 公网端口：`/link/info`、`/health` 免鉴权放行（200）；`/link/panel` 收紧为仅本机
+- [x] `/link/code`、`/link/panel` 仅本机：转发层直接 403 `local-only`，宿主侧见到 `x-aidock-edge` 也判非本机
+- [x] 连接码 10 分钟轮换（`~/.dsh/aidock-code.json`）、面板每 20 秒续期
+- [x] `/api/mobile/v1/sessions` 与 `/link/sessions` 均 200（apiProxy 兼容桥已生效）
 
 ## 六、仓库卫生（自动化）
 
-- [ ] 推送后的树里没有反斜杠路径（Windows 路径泄漏成文件名的老 bug）
-- [ ] 没有把 token/密钥写进仓库（`~/.dsh/github-token.txt` 只在本地）
-- [ ] Release 名称、APK 文件名与 commit 对得上
+- [x] 推送后的树里没有反斜杠路径（`pushproto.mjs` 已跳过含 `\` 的路径，并用 `PRUNE` 清过历史）
+- [x] 没有把 token/密钥写进仓库（工作区 grep `gho_` 无命中，token 只在 `~/.dsh/github-token.txt`）
+- [x] Release 名称、APK 文件名与 commit 对得上（`apk-33` / `AIDock-2ba968a.apk`）
