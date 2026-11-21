@@ -648,6 +648,27 @@ class AppState extends ChangeNotifier {
   ///
   /// 不传落点＝落到宿主的默认工作区：手机上没有「选目录」的必要，先把「点一下就能聊」
   /// 打通；要指定项目时再从会话页传 `workspaceId`/`cwd`。
+  /// 电脑上这条会话可用的斜杠命令（聊天框里打 `/` 时提示）。
+  final List<Map<String, dynamic>> slashCommands = [];
+  bool loadingCommands = false;
+
+  Future<void> loadCommands() async {
+    final c = _client;
+    final sid = openSessionId;
+    if (c == null || sid == null || loadingCommands) return;
+    loadingCommands = true;
+    slashCommands.clear();
+    try {
+      final list = await c.commands(sid);
+      slashCommands.addAll(list);
+    } catch (_) {
+      // 命令表取不到不影响正常发消息，静默即可。
+    } finally {
+      loadingCommands = false;
+      notifyListeners();
+    }
+  }
+
   /// 电脑上登记过的工作区（新建会话时可以选）。
   List<Map<String, dynamic>> workspaces = [];
   bool loadingWorkspaces = false;
@@ -766,6 +787,7 @@ class AppState extends ChangeNotifier {
     _attachStream(c, item.id);
     // 顶栏要显示当前模型，进会话就顺手拉一次（失败不阻塞打开）。
     unawaited(loadModels());
+    unawaited(loadCommands());
   }
 
   /// 挂上会话流，并在断开时自己重连。

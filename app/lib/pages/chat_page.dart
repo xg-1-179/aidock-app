@@ -19,6 +19,9 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   final _input = TextEditingController();
+
+  /// 输入框以 `/` 开头时的候选命令（前缀过滤后的结果）。
+  List<Map<String, dynamic>> _slash = const [];
   final _scroll = ScrollController();
   int _seen = 0;
 
@@ -159,6 +162,7 @@ class _ChatPageState extends State<ChatPage> {
 
   void _send() {
     final text = _input.text;
+    if (_slash.isNotEmpty) setState(() => _slash = const []);
     if (text.trim().isEmpty) return;
     _input.clear();
     widget.state.send(text);
@@ -263,12 +267,17 @@ class _ChatPageState extends State<ChatPage> {
                 color: AidockColors.bg,
                 border: Border(top: BorderSide(color: AidockColors.line)),
               ),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_slash.isNotEmpty) _slashBar(),
+                  Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Expanded(
                     child: TextField(
                       controller: _input,
+                      onChanged: _onInputChanged,
                       minLines: 1,
                       maxLines: 5,
                       textInputAction: TextInputAction.newline,
@@ -305,9 +314,75 @@ class _ChatPageState extends State<ChatPage> {
                     ),
                   ),
                 ],
+                  ),
+                ],
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  /// 输入框以 `/` 开头时按前缀过滤命令表（最多 6 条）。
+  void _onInputChanged(String raw) {
+    final text = raw.trimLeft();
+    if (!text.startsWith('/') || text.contains(' ') || text.contains('\n')) {
+      if (_slash.isNotEmpty) setState(() => _slash = const []);
+      return;
+    }
+    final q = text.substring(1).toLowerCase();
+    final all = widget.state.slashCommands;
+    final hits = all
+        .where((c) => '${c['name'] ?? ''}'.toLowerCase().startsWith(q))
+        .take(6)
+        .toList();
+    setState(() => _slash = hits);
+  }
+
+  Widget _slashBar() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: AidockColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AidockColors.line),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final c in _slash)
+            InkWell(
+              onTap: () {
+                _input.text = '/${c['name']} ';
+                _input.selection = TextSelection.collapsed(offset: _input.text.length);
+                setState(() => _slash = const []);
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                child: Row(
+                  children: [
+                    Text('/${c['name']}',
+                        style: const TextStyle(
+                            fontSize: 13,
+                            fontFamily: 'monospace',
+                            color: AidockColors.accent)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '${c['description'] ?? ''}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11.5, color: AidockColors.textDim),
+                      ),
+                    ),
+                    if (c['input'] is Map && '${(c['input'] as Map)['hint'] ?? ''}'.isNotEmpty)
+                      Text('${(c['input'] as Map)['hint']}',
+                          style: const TextStyle(fontSize: 10.5, color: AidockColors.textDim)),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
