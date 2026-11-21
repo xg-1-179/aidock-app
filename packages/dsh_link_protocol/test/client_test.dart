@@ -31,7 +31,7 @@ class MockHost {
   Future<void> _handle(HttpRequest req) async {
     final body = await utf8.decoder.bind(req).join();
     final path = req.uri.path;
-    seenPaths.add('${req.method} $path${req.uri.query}');
+    seenPaths.add('${req.method} $path' + (req.uri.query.isEmpty ? '' : '?${req.uri.query}'));
 
     if (path == '/api/mobile/v1/pair') {
       final pairKey = await DshCrypto.pairKey(_ticket, _instanceId);
