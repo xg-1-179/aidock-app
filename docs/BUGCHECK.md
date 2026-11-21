@@ -151,3 +151,13 @@
 | 实现 | `app/lib/notify.dart` 的 `Notifier.ask()/show()`，全 try/catch（桌面或测试环境没有通道时静默）；`app/lib/main.dart` 用 `WidgetsBindingObserver` 维护 `appForeground` |
 | 构建验证 | CI 里 `patch_android_notify.py` 覆写 MainActivity 后 `flutter build apk --release` 通过即代表 Kotlin 可用（`android.app.Notification` 平台自带，不依赖 androidx.core） |
 | 人工项 | 真机锁屏/后台时是否弹出、点通知是否能回到 App、Android 13 首次授权框 |
+
+## 十三、深链接（扫面板二维码直接进 App）
+
+| 项 | 结论 |
+| --- | --- |
+| 链路 | 面板二维码内容 `aidock://v1?h=<地址>&c=<六位码>&i=<instanceId>` → 系统相机/扫码器 → Android intent → `MainActivity.onNewIntent` 或冷启动 `intent.data` → `MethodChannel('aidock/link')` → Dart |
+| 安卓侧 | `scripts/patch_android_notify.py` 同时注入 `aidock/link` 通道（`initial` 取冷启动、`link` 推热启动）与 manifest 的 `<intent-filter>`（`scheme="aidock"`、`BROWSABLE`） |
+| Dart 侧 | `app/lib/deeplink.dart`（`DeepLink.initial()` / `DeepLink.listen()`）+ 配对页 `_fromDeepLink()`：解析出地址与码后自动填好并直接连 |
+| 与 App 内扫码的关系 | App 内「扫面板二维码」走 `mobile_scanner`（需相机权限）；系统相机扫码走 intent（不需要 App 内相机）。两条路互不冲突 |
+| 人工项 | 用手机系统相机扫面板二维码 → 是否弹出「用 AIDock 打开」→ 打开后是否自动连上 |

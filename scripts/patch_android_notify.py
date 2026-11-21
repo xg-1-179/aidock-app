@@ -1,12 +1,14 @@
-"""给安卓壳装上「手机通知」通道（不引第三方插件，直接改 MainActivity）。
+"""给安卓壳装上「手机通知 + 深链接」两条通道（不引第三方插件，直接改 MainActivity）。
 
 flutter create 生成的 MainActivity 是空的 `FlutterActivity` 子类，这里换成带
 `MethodChannel('aidock/notify')` 的版本：
   - `ask`  → Android 13+ 申请 POST_NOTIFICATIONS 运行时权限
   - `show` → 用 NotificationChannel 发一条提醒（审批待处理、提问待回答、回合结束）
 
-只依赖平台自带的 `android.app.Notification`，不碰 androidx.core，减少构建风险。
-同时往 manifest 里补 POST_NOTIFICATIONS 声明。
+另外接 `MethodChannel('aidock/link')`：把系统相机/扫码器打开 `aidock://v1?...`
+时带进来的 URL 交给 Dart（`initial` 取冷启动那一条，`link` 事件推热启动）。
+只依赖平台自带 API，不碰 androidx.core，减少构建风险。
+同时往 manifest 里补 POST_NOTIFICATIONS 声明与 `aidock://` 的 intent-filter。
 """
 import pathlib
 import sys
@@ -25,9 +27,22 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {{
     private val channelId = "aidock.alerts"
     private val channelName = "AIDock 提醒"
+    private var linkChannel: MethodChannel? = null
+    private var pendingLink: String? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {{
         super.configureFlutterEngine(flutterEngine)
+        linkChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aidock/link")
+        linkChannel!!.setMethodCallHandler {{ call, result ->
+            when (call.method) {{
+                "initial" -> {{
+                    val url = pendingLink ?: aidockLink(intent)
+                    pendingLink = null
+                    result.success(url)
+                }}
+                else -> result.notImplemented()
+            }}
+        }}
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aidock/notify")
             .setMethodCallHandler {{ call, result ->
                 when (call.method) {{
@@ -48,6 +63,24 @@ class MainActivity : FlutterActivity() {{
                     else -> result.notImplemented()
                 }}
             }}
+    }}
+
+    override fun onNewIntent(intent: android.content.Intent) {{
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val url = aidockLink(intent) ?: return
+        val ch = linkChannel
+        if (ch == null) {{
+            pendingLink = url
+        }} else {{
+            ch.invokeMethod("link", url)
+        }}
+    }}
+
+    private fun aidockLink(intent: android.content.Intent?): String? {{
+        val data = intent?.data ?: return null
+        if (data.scheme != "aidock") return null
+        return data.toString()
     }}
 
     private fun show(title: String, body: String) {{
@@ -100,6 +133,23 @@ def main() -> int:
         )
         manifest.write_text(s, encoding="utf-8")
         print("notify permission: POST_NOTIFICATIONS")
+
+    m = manifest.read_text(encoding="utf-8")
+    if 'android:scheme="aidock"' not in m:
+        filter_block = (
+            '            <intent-filter>\n'
+            '                <action android:name="android.intent.action.VIEW" />\n'
+            '                <category android:name="android.intent.category.DEFAULT" />\n'
+            '                <category android:name="android.intent.category.BROWSABLE" />\n'
+            '                <data android:scheme="aidock" />\n'
+            '            </intent-filter>\n'
+            '        </activity>'
+        )
+        idx = m.find('        </activity>')
+        if idx != -1:
+            m = m[:idx] + filter_block + m[idx + len('        </activity>'):]
+            manifest.write_text(m, encoding="utf-8")
+            print("link intent-filter: aidock://")
     return 0
 
 

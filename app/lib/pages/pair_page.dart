@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app_state.dart';
+import '../deeplink.dart';
 import '../theme.dart';
 import 'scan_page.dart';
 
@@ -17,6 +18,34 @@ class _PairPageState extends State<PairPage> {
   final _host = TextEditingController();
   final _code = TextEditingController();
   final _codeFocus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _fromDeepLink();
+    DeepLink.listen((url) {
+      final link = ScannedLink.parse(url);
+      if (link == null || !mounted) return;
+      setState(() {
+        _host.text = link.host;
+        _code.text = link.code;
+      });
+      _submit();
+    });
+  }
+
+  /// 用系统相机扫面板二维码时，App 是被 intent 唤起的：地址与码直接填好并连。
+  Future<void> _fromDeepLink() async {
+    final raw = await DeepLink.initial();
+    if (raw == null || !mounted) return;
+    final link = ScannedLink.parse(raw);
+    if (link == null) return;
+    setState(() {
+      _host.text = link.host;
+      _code.text = link.code;
+    });
+    _submit();
+  }
 
   @override
   void dispose() {
