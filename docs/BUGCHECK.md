@@ -173,3 +173,20 @@
 | 安装名一致性 | `cordis.patch.yml` 的 `insert: [{ id: dsh-mobile, name: 'aidock' }]` 必须与 `package.json` 的 `name` 一致，否则 Loader 解析不到入口、整棵插件树加载失败；`host.js` 的 `BIN_NAME` 已改为从 `package.json` 读 |
 | 安装实测 | 打 `npm pack` 出的 `aidock-0.1.0.tgz`（294 文件 / 1.8MB）装进全新 profile：`dsh plugin --profile aidocktest add "file:<tgz>"` → `+ aidock 0.1.0`，`bundles: ['@deepseek-ai/dsh-base', 'aidock']`，`node_modules/aidock/lib/index.js` 与改好的 `cordis.patch.yml` 都在位（验证完已删除该临时 profile） |
 | 端到端复验 | 公网口 `t_full.mjs`：`PAIR 200 / SESSIONS 369 / MESSAGES / MODELS / SELECT / PRESETS` 全绿；`/link/info` 200、`/link/code` 403 |
+
+## 十七、自检脚本（本轮新增，已实测全绿）
+
+电脑侧插件仓库带了 `tools/selftest.js`：不装任何依赖，按 App 的真实顺序把整条链路跑一遍，
+适合「改完插件先自证没改坏」。
+
+| 项 | 结果 |
+|---|---|
+| 本机 `node tools/selftest.js` | **12 passed / 0 failed**（探活、面板、六位码、配对、授权解封、会话列表 370、历史、模型） |
+| 本机加 `--send --stream` | 同上 + 新建会话 200、发送 200、SSE `text/event-stream` 200 |
+| 公网口 `--base http://101.43.213.201:41873 --send --stream` | **14 passed / 0 failed**（另含 `/link/panel`、`/link/code`、`/link/qr.svg` 三个 403） |
+| 退出码 | 0 = 全过；1 = 有 FAIL，便于接 CI |
+
+口径提醒：**实例号以 `/link/info` 为准**。`/api/mobile/v1/health` 是插件早期一代注册的路由，
+`POST /api/relay/reload-implementation` 不会重新注册已存在的路由，它闭包里的 `state` 停在重启
+前那一代，`instanceId` 可能仍是旧值（自检会打印一行提示）。用旧实例号派生 `pairKey` 会让配对
+恒 401 —— 这一步踩过，已把 `/health` 的实例号改为从 `relay.json` 现读（重启宿主后生效）。
