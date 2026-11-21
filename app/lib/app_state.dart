@@ -169,36 +169,81 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 会话流的一帧。
+  ///
+  /// 宿主下发的是 `{type:'session/event', event:{type, data}}` 这样的包裹层：真正的事件类型
+  /// 在内层的 `event.type` 上（`user/message`、`assistant/chunk`、`assistant/message`、
+  /// `turn/end`…），正文在 `event.data` 上。心跳与收尾帧（`session/heartbeat`、
+  /// `session/resync-required`）不进消息模型。
   void _onFrame(Map<String, dynamic> frame) {
-    final type = '${frame['type'] ?? frame['t'] ?? ''}';
-    final text = '${frame['text'] ?? frame['delta'] ?? frame['content'] ?? ''}';
+    final outer = '${frame['type'] ?? ''}';
+    if (outer == 'session/heartbeat') return;
+    if (outer == 'session/resync-required') {
+      messages.add(ChatMessage(role: 'system', text: '这一段漏了消息，正在重新同步'));
+      notifyListeners();
+      return;
+    }
+    final event = frame['event'];
+    final inner = event is Map<String, dynamic> ? event : frame;
+    final type = '${inner['type'] ?? ''}';
+    final data = inner['data'];
+    final payload = data is Map<String, dynamic> ? data : const <String, dynamic>{};
     switch (type) {
-      case 'message':
-      case 'user':
-        messages.add(ChatMessage(role: 'user', text: text));
+      case 'user/message':
+        final text = _textOfMessage(payload);
+        if (text.isNotEmpty) messages.add(ChatMessage(role: 'user', text: text));
         break;
-      case 'delta':
-      case 'assistant_delta':
+      case 'assistant/chunk':
+        final chunk = payload['chunk'];
+        if (chunk is! Map) break;
+        if ('${chunk['type']}' != 'text-delta') break;
+        final delta = '${chunk['text'] ?? ''}';
+        if (delta.isEmpty) break;
         streamingNow = true;
         if (messages.isNotEmpty && messages.last.role == 'assistant' && messages.last.streaming) {
-          messages.last.text += text;
+          messages.last.text += delta;
         } else {
-          messages.add(ChatMessage(role: 'assistant', text: text, streaming: true));
+          messages.add(ChatMessage(role: 'assistant', text: delta, streaming: true));
         }
         break;
-      case 'done':
-      case 'turn_end':
+      case 'assistant/message':
+        final msg = payload['message'];
+        final text = _textOfMessage(msg is Map<String, dynamic> ? msg : payload);
         streamingNow = false;
         if (messages.isNotEmpty && messages.last.streaming) {
           messages.last.streaming = false;
-        }
-        break;
-      default:
-        if (text.isNotEmpty) {
+          if (text.isNotEmpty) messages.last.text = text;
+        } else if (text.isNotEmpty) {
           messages.add(ChatMessage(role: 'assistant', text: text));
         }
+        break;
+      case 'turn/end':
+      case 'step/end':
+        streamingNow = false;
+        if (messages.isNotEmpty) messages.last.streaming = false;
+        break;
+      default:
+        break;
     }
     notifyListeners();
+  }
+
+  /// 从一条消息对象里取纯文本：`content` 可能是字符串，也可能是 `[{type:'text',text}]`。
+  static String _textOfMessage(Map<String, dynamic> msg) {
+    final direct = msg['text'];
+    if (direct is String && direct.isNotEmpty) return direct;
+    final content = msg['content'];
+    if (content is String) return content;
+    if (content is List) {
+      final buffer = StringBuffer();
+      for (final part in content) {
+        if (part is Map && '${part['type']}' == 'text') {
+          buffer.write('${part['text'] ?? ''}');
+        }
+      }
+      return buffer.toString();
+    }
+    return '';
   }
 
   Future<void> send(String text) async {
