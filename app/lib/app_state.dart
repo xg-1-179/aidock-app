@@ -334,7 +334,7 @@ class AppState extends ChangeNotifier {
           id: id,
           title: '新会话',
           subtitle: cwd,
-          updatedAt: DateTime.now(),
+          updatedAt: DateTime.now().millisecondsSinceEpoch,
           running: false,
           pending: false,
           failed: false,
