@@ -553,13 +553,54 @@ class AppState extends ChangeNotifier {
   ///
   /// 不传落点＝落到宿主的默认工作区：手机上没有「选目录」的必要，先把「点一下就能聊」
   /// 打通；要指定项目时再从会话页传 `workspaceId`/`cwd`。
-  Future<void> createSession() async {
+  /// 电脑上登记过的工作区（新建会话时可以选）。
+  List<Map<String, dynamic>> workspaces = [];
+  bool loadingWorkspaces = false;
+
+  Future<void> loadWorkspaces() async {
+    final c = _client;
+    if (c == null || loadingWorkspaces) return;
+    loadingWorkspaces = true;
+    try {
+      workspaces = await c.workspaces();
+      error = null;
+    } catch (e) {
+      error = '读取工作区失败：$e';
+    } finally {
+      loadingWorkspaces = false;
+      notifyListeners();
+    }
+  }
+
+  /// 改会话标题（会话页长按菜单）。成功后就地更新列表条目。
+  Future<bool> renameSession(String sessionId, String title) async {
+    final c = _client;
+    final name = title.trim();
+    if (c == null || name.isEmpty) return false;
+    try {
+      final real = await c.renameSession(sessionId, name);
+      for (final it in sessions) {
+        if (it.id == sessionId) {
+          it.title = real;
+          break;
+        }
+      }
+      notifyListeners();
+      return true;
+    } catch (e) {
+      error = '重命名失败：$e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<void> createSession({String? workspaceId}) async {
     final c = _client;
     if (c == null) return;
     busy = true;
     notifyListeners();
     try {
-      final created = await c.newSession();
+      final created = await c.newSession(workspaceId: workspaceId);
       final id = '${created['sessionId'] ?? created['id'] ?? ''}';
       final cwd = '${created['cwd'] ?? ''}';
       await refreshSessions();

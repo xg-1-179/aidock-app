@@ -428,6 +428,23 @@ class DshClient {
     return const <Map<String, dynamic>>[];
   }
 
+  /// 电脑上登记过的工作区（新建会话要选一个，否则宿主会拒）。
+  ///
+  /// 列表类响应外面还套一层 `env`，`_decode` 已经解掉，这里只兜字段名差异。
+  Future<List<Map<String, dynamic>>> workspaces() async {
+    final r = await call('GET', '$_prefix/link/workspaces');
+    final raw = r['workspaces'] ?? r['items'] ?? r['data'];
+    if (raw is List) return raw.whereType<Map<String, dynamic>>().toList();
+    return const <Map<String, dynamic>>[];
+  }
+
+  /// 改会话标题。宿主回 `{ok:true, title, seq}`。
+  Future<String> renameSession(String sessionId, String title) async {
+    final r = await call('POST', '$_prefix/link/session/rename',
+        payload: {'sessionId': sessionId, 'title': title});
+    return '${r['title'] ?? title}';
+  }
+
   /// 电脑上可用的智能体预设。
   Future<List<Map<String, dynamic>>> agentPresets() async {
     final r = await call('GET', '$_prefix/link/agent-presets');
