@@ -16,10 +16,15 @@ class Notifier {
     }
   }
 
-  static Future<void> show(String title, String body) async {
+  /// [sessionId] 非空时，点通知会带着它回到 App 并直接打开那条会话。
+  static Future<void> show(String title, String body, {String? sessionId}) async {
     if (body.trim().isEmpty) return;
     try {
-      await _ch.invokeMethod<void>('show', {'title': title, 'body': body});
+      await _ch.invokeMethod<void>('show', {
+        'title': title,
+        'body': body,
+        if (sessionId != null && sessionId.isNotEmpty) 'sessionId': sessionId,
+      });
     } catch (_) {}
   }
 }

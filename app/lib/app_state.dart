@@ -203,7 +203,50 @@ class AppState extends ChangeNotifier {
   /// 待回答的提问卡（同一条 rpcId 只留一张）。
   final List<QuestionCard> questions = [];
 
+  // ---- 设备管理 / 定时任务（都直接打宿主原路径，见 DshClient.api）----
+  final List<Map<String, dynamic>> devices = [];
+  bool loadingDevices = false;
+  final List<Map<String, dynamic>> schedules = [];
+  bool loadingSchedules = false;
+
+  // ---- 界面偏好：字号 ----
+  static const String _kTextScale = 'aidock.textScale';
+  double textScale = 1.0;
+
+  // ---- 运行日志（导出给开发者看的那种，只有最近 200 行）----
+  final List<String> _log = [];
+  List<String> get logLines => List<String>.unmodifiable(_log);
+  String get logText => _log.join('\n');
+  void logLine(String line) {
+    final stamp = DateTime.now().toIso8601String().substring(11, 19);
+    _log.add('$stamp $line');
+    if (_log.length > 200) _log.removeRange(0, _log.length - 200);
+  }
+
+  void clearLog() {
+    _log.clear();
+    notifyListeners();
+  }
+
   String? openSessionId;
+
+  /// 通知/深链指过来的会话 id：会话页消费它并直接进聊天页。
+  String? pendingOpenSession;
+
+  /// 按 id 开会话（列表里没有就自己造一条占位）。
+  Future<void> openSessionById(String sessionId) async {
+    final hit = sessions.where((e) => e.id == sessionId);
+    if (hit.isNotEmpty) {
+      await openSession(hit.first);
+      return;
+    }
+    await openSession(SessionItem(
+      id: sessionId,
+      title: '会话',
+      subtitle: '',
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+    ));
+  }
   bool streamingNow = false;
   StreamSubscription<Map<String, dynamic>>? _sub;
   Timer? _watchdog;
@@ -1088,7 +1131,8 @@ class AppState extends ChangeNotifier {
             questions: items,
           ));
           if (isNew && !appForeground) {
-            unawaited(Notifier.show('电脑在等你回答', items.first.text));
+            unawaited(Notifier.show('电脑在等你回答', items.first.text,
+          sessionId: '${inner['sessionId'] ?? payload['sessionId'] ?? ''}'));
           }
         }
         break;
@@ -1126,7 +1170,8 @@ class AppState extends ChangeNotifier {
         break;
       case 'turn/end':
         if (!appForeground && streamingNow) {
-          unawaited(Notifier.show('这一轮跑完了', _lastAssistantText()));
+          unawaited(Notifier.show('这一轮跑完了', _lastAssistantText(),
+          sessionId: openSessionId));
         }
         break;
       case 'step/end':
@@ -1358,6 +1403,96 @@ class AppState extends ChangeNotifier {
       streamingNow = false;
       messages.add(ChatMessage(role: 'system', text: '发送失败：$e'));
       notifyListeners();
+    }
+  }
+
+  /// 载入本机界面偏好（字号）。启动时调一次。
+  Future<void> loadUiPrefs() async {
+    final p = await SharedPreferences.getInstance();
+    textScale = (p.getDouble(_kTextScale) ?? 1.0).clamp(0.85, 1.6);
+    notifyListeners();
+  }
+
+  Future<void> setTextScale(double value) async {
+    textScale = value.clamp(0.85, 1.6);
+    notifyListeners();
+    final p = await SharedPreferences.getInstance();
+    await p.setDouble(_kTextScale, textScale);
+  }
+
+  /// 「这台电脑上还连着哪些手机」——只读清单。
+  Future<void> loadDevices() async {
+    final c = _client;
+    if (c == null) return;
+    loadingDevices = true;
+    notifyListeners();
+    try {
+      final j = await c.api('GET', '/paired-devices');
+      devices
+        ..clear()
+        ..addAll(((j['devices'] as List?) ?? const [])
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e)));
+      logLine('devices: ${devices.length}');
+    } catch (e) {
+      logLine('devices 失败：$e');
+      setError('读不到已配对设备：$e');
+    } finally {
+      loadingDevices = false;
+      notifyListeners();
+    }
+  }
+
+  /// 按 deviceId 整台吊销（宿主那边会把同名下的所有活凭据一起收）。
+  Future<bool> revokeDevice(String deviceId) async {
+    final c = _client;
+    if (c == null) return false;
+    try {
+      await c.api('POST', '/paired-devices/revoke', payload: {'deviceId': deviceId});
+      logLine('revoked $deviceId');
+      await loadDevices();
+      return true;
+    } catch (e) {
+      logLine('revoke 失败：$e');
+      setError('吊销失败：$e');
+      return false;
+    }
+  }
+
+  /// 定时任务清单（宿主侧「任务」与「定时会话」都在这里）。
+  Future<void> loadSchedules() async {
+    final c = _client;
+    if (c == null) return;
+    loadingSchedules = true;
+    notifyListeners();
+    try {
+      final j = await c.api('GET', '/schedule/list');
+      schedules
+        ..clear()
+        ..addAll(((j['records'] as List?) ?? const [])
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e)));
+      logLine('schedules: ${schedules.length}');
+    } catch (e) {
+      logLine('schedules 失败：$e');
+      setError('读不到定时任务：$e');
+    } finally {
+      loadingSchedules = false;
+      notifyListeners();
+    }
+  }
+
+  /// `action` 只认 pause / resume / run。
+  Future<void> scheduleAction(String id, String action) async {
+    final c = _client;
+    if (c == null) return;
+    try {
+      await c.api('POST', '/schedule/$action', payload: {'id': id});
+      logLine('schedule $action $id');
+      await loadSchedules();
+    } catch (e) {
+      logLine('schedule $action 失败：$e');
+      setError('操作失败：$e');
     }
   }
 

@@ -267,6 +267,20 @@ class DshClient {
   }
 
   /// 会话列表。
+  /// 直接打一条「原路径」接口（`/api/mobile/v1/…`）。
+  ///
+  /// 功能页（设备、定时任务、Git、插件市场…）不必每个端点都在客户端里包一层：
+  /// 宿主那边这些路由本来就都在，签名与鉴权走同一套 [call]。
+  Future<Map<String, dynamic>> api(
+    String method,
+    String path, {
+    String query = '',
+    Map<String, dynamic>? payload,
+  }) {
+    final full = path.startsWith('/api/') ? path : '/api/mobile/v1$path';
+    return call(method, full, query: query, payload: payload);
+  }
+
   Future<List<Map<String, dynamic>>> sessions({String query = ''}) async {
     // AIDock 宿主把会话清单与历史挂在自己的别名路径上（`link/` 前缀），
     // 这两条与旧的 `/sessions`、`/session/messages` 是同一份实现，只是后者在插件的

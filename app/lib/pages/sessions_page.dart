@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../app_state.dart';
 import '../theme.dart';
 import 'chat_page.dart';
+import 'more_page.dart';
 
 class SessionsPage extends StatefulWidget {
   const SessionsPage({super.key, required this.state});
@@ -17,10 +18,33 @@ class _SessionsPageState extends State<SessionsPage> {
   final _q = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    widget.state.addListener(_maybeOpenPending);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpenPending());
+  }
+
+  /// 从通知/深链进来的会话：把 `pendingOpenSession` 消费掉，直接进聊天页。
+  void _maybeOpenPending() {
+    final state = widget.state;
+    final id = state.pendingOpenSession;
+    if (id == null || !mounted) return;
+    state.pendingOpenSession = null;
+    state.openSessionById(id).then((_) {
+      if (!mounted || state.openSessionId == null) return;
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (context) => ChatPage(state: state)),
+      );
+    });
+  }
+
+  @override
   void dispose() {
+    widget.state.removeListener(_maybeOpenPending);
     _q.dispose();
     super.dispose();
   }
+
 
   /// 本地过滤：电脑上常有几百个会话，滚不动也找不到；
   /// 标题与第二行（最后一条消息 / 路径）都参与匹配。
@@ -66,6 +90,13 @@ class _SessionsPageState extends State<SessionsPage> {
             tooltip: '断开',
             onPressed: state.disconnect,
             icon: const Icon(Icons.link_off_rounded, size: 20),
+          ),
+          IconButton(
+            tooltip: '更多',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (context) => MorePage(state: state)),
+            ),
+            icon: const Icon(Icons.more_horiz_rounded, size: 20),
           ),
         ],
       ),

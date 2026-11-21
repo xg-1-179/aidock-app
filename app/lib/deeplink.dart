@@ -6,6 +6,17 @@ import 'package:flutter/services.dart';
 /// 安卓侧由 `scripts/patch_android_notify.py` 注入 `MethodChannel('aidock/link')`：
 /// `initial` 取冷启动那一条 intent，`link` 推送热启动（App 已在后台）的新 URL。
 class DeepLink {
+  /// 从任意 `aidock://` URL 里取会话 id（通知点击用 `aidock://open?session=<id>`）。
+  static String? sessionOf(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.scheme != 'aidock') return null;
+    final direct = uri.queryParameters['session'];
+    if (direct != null && direct.isNotEmpty) return direct;
+    // 兼容 `aidock://session/<id>` 这种路径形式。
+    if (uri.host == 'session' && uri.pathSegments.isNotEmpty) return uri.pathSegments.first;
+    return null;
+  }
+
   static const MethodChannel _ch = MethodChannel('aidock/link');
 
   static Future<String?> initial() async {

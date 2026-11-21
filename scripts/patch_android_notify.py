@@ -57,7 +57,8 @@ class MainActivity : FlutterActivity() {{
                     "show" -> {{
                         val title = call.argument<String>("title") ?: "AIDock"
                         val body = call.argument<String>("body") ?: ""
-                        show(title, body)
+                        val sessionId = call.argument<String>("sessionId") ?: ""
+                        show(title, body, sessionId)
                         result.success(true)
                     }}
                     else -> result.notImplemented()
@@ -83,7 +84,7 @@ class MainActivity : FlutterActivity() {{
         return data.toString()
     }}
 
-    private fun show(title: String, body: String) {{
+    private fun show(title: String, body: String, sessionId: String) {{
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val builder: Notification.Builder = if (Build.VERSION.SDK_INT >= 26) {{
             nm.createNotificationChannel(
@@ -94,8 +95,24 @@ class MainActivity : FlutterActivity() {{
             @Suppress("DEPRECATION")
             Notification.Builder(this)
         }}
+        // 点通知回到 App：带会话 id 时用 `aidock://open?session=<id>`，由 Dart 侧
+        // `DeepLink.sessionOf` 认出来并直接打开那条会话；没有会话 id 就只是打开 App。
+        val openUrl = if (sessionId.isNotEmpty)
+            "aidock://open?session=" + android.net.Uri.encode(sessionId)
+        else "aidock://open"
+        val openIntent = android.content.Intent(this, MainActivity::class.java).apply {{
+            action = android.content.Intent.ACTION_VIEW
+            data = android.net.Uri.parse(openUrl)
+            flags = android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }}
+        val flags = if (Build.VERSION.SDK_INT >= 23)
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        else android.app.PendingIntent.FLAG_UPDATE_CURRENT
+        val pi = android.app.PendingIntent.getActivity(this, 7, openIntent, flags)
         val n = builder
             .setSmallIcon(android.R.drawable.stat_notify_chat)
+            .setContentIntent(pi)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(Notification.BigTextStyle().bigText(body))
