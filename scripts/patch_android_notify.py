@@ -97,7 +97,7 @@ class MainActivity : FlutterActivity() {{
         }}
         // 点通知回到 App：带会话 id 时用 `aidock://open?session=<id>`，由 Dart 侧
         // `DeepLink.sessionOf` 认出来并直接打开那条会话；没有会话 id 就只是打开 App。
-        val openUrl = if (sessionId.isNotEmpty)
+        val openUrl = if (sessionId.isNotEmpty())
             "aidock://open?session=" + android.net.Uri.encode(sessionId)
         else "aidock://open"
         val openIntent = android.content.Intent(this, MainActivity::class.java).apply {{
