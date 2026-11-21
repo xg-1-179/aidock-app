@@ -908,8 +908,15 @@ class AppState extends ChangeNotifier {
 
   /// 从一条消息对象里取纯文本：`content` 可能是字符串，也可能是 `[{type:'text',text}]`。
   static String _textOfMessage(Map<String, dynamic> msg) {
+    final blocks0 = msg['blocks'];
+    final imageCount = blocks0 is List
+        ? blocks0.where((b) => b is Map && '${b['type']}' == 'image').length
+        : 0;
     final direct = msg['text'];
-    if (direct is String && direct.isNotEmpty) return direct;
+    if (direct is String && direct.isNotEmpty) {
+      if (imageCount == 0) return direct;
+      return '$direct${imageCount == 1 ? '\n（图片）' : '\n（$imageCount 张图片）'}';
+    }
     final content = msg['content'];
     if (content is String) return content;
     if (content is List) {
@@ -925,6 +932,9 @@ class AppState extends ChangeNotifier {
     // tool-call。不补一句的话历史里会出现一串空气泡，用户看不到那轮干了什么。
     final blocks = msg['blocks'];
     if (blocks is List && blocks.isNotEmpty) {
+      // 只有图没有正文的轮次（手机发图、或模型只回一张图）也要有可见占位，
+      // 否则历史里是空气泡。多张就报张数。
+      final images = blocks.where((b) => b is Map && '${b['type']}' == 'image').length;
       final names = <String>[];
       for (final b in blocks) {
         if (b is Map && '${b['type']}' == 'tool-call') {
@@ -933,6 +943,7 @@ class AppState extends ChangeNotifier {
         }
       }
       if (names.isNotEmpty) return '调用工具 ${names.join('、')}';
+      if (images > 0) return images == 1 ? '（图片）' : '（$images 张图片）';
     }
     return '';
   }

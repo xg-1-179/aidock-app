@@ -93,3 +93,15 @@
 | 安全 | 公网口 `/link/qr.svg`、`/link/panel`、`/link/code` 均 403（转发器 `LOCAL_ONLY` + 插件 `x-aidock-edge` 双层），`X-Aidock-Code` 头保留 |
 | 实测 | 本机 qr.svg 200（2,423 字节 SVG）；公网三条路由 403、`/health` 200；payload 经 URL 解析回填 `h=http://101.43.213.201:41873`、`c=859603` |
 | 人工项 | 真机相机扫码（io 无摄像头） |
+
+## 十、图片消息
+
+| 项 | 结论 |
+| --- | --- |
+| 发送 | 聊天输入框左侧「发图片」→ 相册选图（`image_picker`，压到 1600px / 质量 78）→ `content` 块 `[{text?}, {type:'image', data:<base64>, mediaType, name}]` |
+| 协议 | `DshClient.sendContent(sessionId, content)` → `POST /api/mobile/v1/link/session/send`（宿主 `handleSend` 认 `content` 或 `text`） |
+| 宿主限制 | 明文 8MB / 线上 10.7MB；图片块带 `data` 就直接内联，不必走 uploadId |
+| 实测（公网 41873） | `SEND 200 {"ok":true,"accepted":true}`；随后 `/link/messages` 出现 `role:user` 且 `blocks=text|image`，模型答「红色」→ 图确实进了模型 |
+| 失败形状 | 图片数据不可解码时宿主回 `400 {"code":"session/attachment-invalid","reason":"INVALID_IMAGE"}`（我第一次用坏 base64 试出来的） |
+| 显示 | 历史里带图无正文的轮次显示「（图片）」/「（N 张图片）」，避免空气泡；气泡内暂不内嵌缩略图 |
+| 人工项 | 真机相册选图（有系统的权限弹窗）、超大图（>8MB 原图）会被压缩后再发 |
