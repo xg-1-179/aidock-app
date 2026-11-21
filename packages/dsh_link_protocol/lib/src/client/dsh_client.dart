@@ -169,9 +169,28 @@ class DshClient {
       body: env.body,
     );
     if (!res.ok) {
-      throw DshClientException('request failed', status: res.status, body: res.body);
+      throw DshClientException(_errorMessageOf(res), status: res.status, body: res.body);
     }
     return _decode(res.body, method: method, path: path, env: env);
+  }
+
+  /// 失败响应里宿主会把话写在 `{"ok":false,"error":{"code","message"}}`；
+  /// 原样把 `request failed` 抛给用户等于什么都没说（尤其是 401/403 这两类）。
+  static String _errorMessageOf(DshHttpResponse res) {
+    try {
+      final j = jsonDecode(res.body);
+      if (j is Map) {
+        final err = j['error'];
+        if (err is Map && err['message'] is String && '${err['message']}'.isNotEmpty) {
+          return '${err['message']}';
+        }
+        if (err is String && err.isNotEmpty) return err;
+        if (j['message'] is String && '${j['message']}'.isNotEmpty) return '${j['message']}';
+      }
+    } catch (_) {
+      // 非 JSON（网关页之类）：退回通用文案。
+    }
+    return 'request failed';
   }
 
   Future<Map<String, dynamic>> _decode(

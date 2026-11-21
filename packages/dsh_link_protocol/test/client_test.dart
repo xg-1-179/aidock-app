@@ -102,6 +102,15 @@ class MockHost {
       return;
     }
 
+    if (path == '/api/mobile/v1/denied-msg') {
+      req.response.statusCode = 401;
+      _json(req, {
+        'ok': false,
+        'error': {'code': 'unauthorized', 'message': '登录凭据过期了，请重新配对'},
+      });
+      return;
+    }
+
     if (path.endsWith('/session/stream')) {
       // 会话流是 SSE：一帧一条 `data:`，帧信封的 AAD 钉着「路径 + 请求 ts/nonce + 帧序号」。
       final ts = req.headers.value('x-dsh-ts') ?? '';
@@ -251,6 +260,16 @@ void main() {
     final e = DshClientException('boom', status: 401, body: 'unauthorized');
     expect(e.status, 401);
     expect(e.toString(), contains('HTTP 401'));
+  });
+
+  test('失败响应带出宿主的 error.message，而不是笼统的 request failed', () async {
+    try {
+      await client.call('GET', '/api/mobile/v1/denied-msg');
+      fail('应该抛异常');
+    } on DshClientException catch (e) {
+      expect(e.status, 401);
+      expect(e.message, contains('登录凭据过期了'));
+    }
   });
 
   test('SSE 帧按 v2|down|sse 解密', () async {

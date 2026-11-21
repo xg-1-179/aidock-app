@@ -373,7 +373,9 @@ class AppState extends ChangeNotifier {
       );
       await refreshSessions();
     } on DshClientException catch (e) {
-      error = e.status == 401 ? '连接码不对，或已经过期' : '${e.message}（HTTP ${e.status}）';
+      error = e.status == 401
+          ? '连接码不对，或已经过期'
+          : (e.status == null ? e.message : '${e.message}（HTTP ${e.status}）');
       paired = false;
     } on FormatException catch (e) {
       error = e.message;
@@ -531,7 +533,9 @@ class AppState extends ChangeNotifier {
       }
       error = null;
     } on DshClientException catch (e) {
-      error = '新建会话失败：${e.message}（HTTP ${e.status}）';
+      error = e.status == null
+          ? '新建会话失败：${e.message}'
+          : '新建会话失败：${e.message}（HTTP ${e.status}）';
     } catch (e) {
       error = '新建会话失败：$e';
     }
