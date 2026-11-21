@@ -194,6 +194,46 @@ class DshClient {
     return const [];
   }
 
+  /// 会话历史：进入对话先拉最近 N 条（`thin=1` 让宿主按轮裁掉过程块）。
+  Future<List<Map<String, dynamic>>> messages(
+    String sessionId, {
+    int limit = 50,
+    int? beforeSeq,
+    bool thin = true,
+  }) async {
+    final q = StringBuffer('?sessionId=${Uri.encodeQueryComponent(sessionId)}')
+      ..write('&limit=$limit');
+    if (beforeSeq != null) q.write('&beforeSeq=$beforeSeq');
+    if (thin && beforeSeq == null) q.write('&thin=1');
+    final r = await call('GET', '$_prefix/session/messages', query: q.toString());
+    final list = r['messages'] ?? r['items'] ?? r['data'];
+    if (list is List) {
+      return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+    return const [];
+  }
+
+  /// 审批卡作答：`outcome` 取 `allowed-once` / `denied` / `allowed-class`。
+  Future<Map<String, dynamic>> respondApproval({
+    required String rpcId,
+    required String sessionId,
+    required String approvalId,
+    required String outcome,
+    String reason = '',
+  }) {
+    return call(
+      'POST',
+      '$_prefix/approval/respond',
+      payload: {
+        'rpcId': rpcId,
+        'sessionId': sessionId,
+        'approvalId': approvalId,
+        'outcome': outcome,
+        if (reason.isNotEmpty) 'reason': reason,
+      },
+    );
+  }
+
   /// 发一条消息。`fresh=1` 表示这是新一轮（不追加到上一条助手回复）。
   Future<Map<String, dynamic>> sendMessage(
     String sessionId,

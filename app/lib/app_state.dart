@@ -21,6 +21,36 @@ class SessionItem {
   int updatedAt;
 }
 
+class ApprovalCard {
+  ApprovalCard({
+    required this.rpcId,
+    required this.sessionId,
+    required this.approvalId,
+    this.toolName = '',
+    this.reason = '',
+    this.fact = '',
+    this.classLabel = '',
+    this.command = '',
+    this.rememberable = false,
+  });
+
+  final String rpcId;
+  final String sessionId;
+  final String approvalId;
+  final String toolName;
+  final String reason;
+  final String fact;
+  final String classLabel;
+  final String command;
+  final bool rememberable;
+
+  String get headline {
+    if (reason.isNotEmpty) return reason;
+    if (toolName.isNotEmpty) return '工具 $toolName 请求越权执行';
+    return '有一项操作在等你的许可';
+  }
+}
+
 class AppState extends ChangeNotifier {
   IoDshTransport? _transport;
 
@@ -37,6 +67,7 @@ class AppState extends ChangeNotifier {
 
   final List<SessionItem> sessions = [];
   final List<ChatMessage> messages = [];
+  final List<ApprovalCard> approvals = [];
 
   String? openSessionId;
   bool streamingNow = false;
@@ -144,12 +175,29 @@ class AppState extends ChangeNotifier {
     await _sub?.cancel();
     _sub = null;
     openSessionId = item.id;
-    messages
-      ..clear()
-      ..add(ChatMessage(role: 'system', text: '已打开「${item.title}」'));
+    messages.clear();
+    approvals.clear();
     notifyListeners();
     final c = _client;
     if (c == null) return;
+    // 先补历史，再挂流：流只负责「打开之后」发生的事，历史由 /session/messages 给。
+    try {
+      final rows = await c.messages(item.id, limit: 40);
+      for (final row in rows) {
+        final role = '${row['role'] ?? row['author'] ?? ''}';
+        final text = _textOfMessage(row);
+        if (text.isEmpty) continue;
+        final mine = role == 'user' || role == 'human';
+        messages.add(ChatMessage(role: mine ? 'user' : 'assistant', text: text));
+      }
+      if (messages.isEmpty) {
+        messages.add(ChatMessage(role: 'system', text: '这个会话还没有消息'));
+      }
+      error = null;
+    } catch (e) {
+      messages.add(ChatMessage(role: 'system', text: '历史读取失败：$e'));
+    }
+    notifyListeners();
     _sub = c.stream(item.id).listen(_onFrame, onError: (Object e) {
       streamingNow = false;
       messages.add(ChatMessage(role: 'system', text: '流断开：$e'));
@@ -165,6 +213,7 @@ class AppState extends ChangeNotifier {
     _sub = null;
     openSessionId = null;
     messages.clear();
+    approvals.clear();
     streamingNow = false;
     notifyListeners();
   }
@@ -217,6 +266,27 @@ class AppState extends ChangeNotifier {
           messages.add(ChatMessage(role: 'assistant', text: text));
         }
         break;
+      case 'approval/requested':
+        final card = ApprovalCard(
+          rpcId: '${inner['rpcId'] ?? ''}',
+          sessionId: '${inner['sessionId'] ?? openSessionId ?? ''}',
+          approvalId: '${inner['approvalId'] ?? ''}',
+          toolName: '${inner['toolName'] ?? ''}',
+          reason: '${inner['reason'] ?? ''}',
+          fact: '${inner['fact'] ?? ''}',
+          classLabel: '${inner['classLabel'] ?? ''}',
+          command: '${inner['command'] ?? ''}',
+          rememberable: inner['rememberable'] == true,
+        );
+        if (card.rpcId.isNotEmpty && card.approvalId.isNotEmpty) {
+          approvals.removeWhere((e) => e.approvalId == card.approvalId);
+          approvals.add(card);
+        }
+        break;
+      case 'approval/resolved':
+        final id = '${inner['approvalId'] ?? payload['approvalId'] ?? ''}';
+        if (id.isNotEmpty) approvals.removeWhere((e) => e.approvalId == id);
+        break;
       case 'turn/end':
       case 'step/end':
         streamingNow = false;
@@ -244,6 +314,27 @@ class AppState extends ChangeNotifier {
       return buffer.toString();
     }
     return '';
+  }
+
+  /// 给审批卡作答。`outcome` 取 allowed-once / denied / allowed-class。
+  Future<void> respond(ApprovalCard card, String outcome) async {
+    final c = _client;
+    if (c == null) return;
+    try {
+      await c.respondApproval(
+        rpcId: card.rpcId,
+        sessionId: card.sessionId,
+        approvalId: card.approvalId,
+        outcome: outcome,
+      );
+      approvals.removeWhere((e) => e.approvalId == card.approvalId);
+      if (outcome == 'denied') {
+        messages.add(ChatMessage(role: 'system', text: '已拒绝：${card.headline}'));
+      }
+    } catch (e) {
+      messages.add(ChatMessage(role: 'system', text: '答复失败：$e'));
+    }
+    notifyListeners();
   }
 
   Future<void> send(String text) async {

@@ -60,16 +60,19 @@ class _ChatPageState extends State<ChatPage> {
               animation: s,
               builder: (context, _) {
                 WidgetsBinding.instance.addPostFrameCallback((_) => _toBottom());
-                if (s.messages.isEmpty) {
+                final cards = s.approvals;
+                if (s.messages.isEmpty && cards.isEmpty) {
                   return const Center(
                     child: Text('说点什么…', style: TextStyle(color: AidockColors.textDim, fontSize: 13)),
                   );
                 }
-                return ListView.builder(
+                return ListView(
                   controller: _scroll,
                   padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
-                  itemCount: s.messages.length,
-                  itemBuilder: (context, i) => _bubble(s.messages[i]),
+                  children: [
+                    for (final m in s.messages) _bubble(m),
+                    for (final card in cards) _approval(card),
+                  ],
                 );
               },
             ),
@@ -114,6 +117,89 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 审批卡：宿主在会话流里推 `approval/requested`，答复走 `/approval/respond`。
+  Widget _approval(ApprovalCard card) {
+    final s = widget.state;
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+      decoration: BoxDecoration(
+        color: AidockColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AidockColors.warn.withValues(alpha: 0.45)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.shield_outlined, size: 16, color: AidockColors.warn),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(card.headline,
+                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AidockColors.text)),
+              ),
+            ],
+          ),
+          if (card.fact.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 7),
+              child: Text(card.fact,
+                  style: const TextStyle(fontSize: 12.5, height: 1.5, color: AidockColors.textDim)),
+            ),
+          if (card.command.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 7),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(
+                  color: AidockColors.bg,
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(color: AidockColors.line),
+                ),
+                child: Text(card.command,
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 11.5, height: 1.45, color: AidockColors.text)),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton(
+                  onPressed: () => s.respond(card, 'allowed-once'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AidockColors.accent,
+                    foregroundColor: const Color(0xFF06121F),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  child: const Text('允许一次', style: TextStyle(fontSize: 13)),
+                ),
+                OutlinedButton(
+                  onPressed: () => s.respond(card, 'denied'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AidockColors.warn,
+                    side: const BorderSide(color: AidockColors.line),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  child: const Text('拒绝', style: TextStyle(fontSize: 13)),
+                ),
+                if (card.rememberable)
+                  TextButton(
+                    onPressed: () => s.respond(card, 'allowed-class'),
+                    child: Text(card.classLabel.isEmpty ? '这一类以后都同意' : '以后都同意：${card.classLabel}',
+                        style: const TextStyle(fontSize: 12.5, color: AidockColors.textDim)),
+                  ),
+              ],
             ),
           ),
         ],
