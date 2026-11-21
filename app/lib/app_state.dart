@@ -711,6 +711,19 @@ class AppState extends ChangeNotifier {
       }
       return buffer.toString();
     }
+    // 纯工具调用的轮次没有正文（`text:""`、`content:null`），只剩 blocks 里的
+    // tool-call。不补一句的话历史里会出现一串空气泡，用户看不到那轮干了什么。
+    final blocks = msg['blocks'];
+    if (blocks is List && blocks.isNotEmpty) {
+      final names = <String>[];
+      for (final b in blocks) {
+        if (b is Map && '${b['type']}' == 'tool-call') {
+          final name = '${b['name'] ?? ''}'.trim();
+          if (name.isNotEmpty && !names.contains(name)) names.add(name);
+        }
+      }
+      if (names.isNotEmpty) return '调用工具 ${names.join('、')}';
+    }
     return '';
   }
 
