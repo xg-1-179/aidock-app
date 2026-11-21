@@ -125,7 +125,7 @@ void main() {
       'v2',
       'POST',
       '/api/mobile/v1/session/send',
-      '?fresh=1',
+      'fresh=1',
       '${env.timestamp}',
       env.nonce,
       envBodyHash,
