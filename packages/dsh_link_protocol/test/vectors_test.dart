@@ -123,7 +123,18 @@ void main() {
       nonce: _u8(_hex(input['bodyNonce'])),
     );
     expect(env.headers['X-Dsh-Nonce'], _b64u(_hex(input['bodyNonce'])));
-    expect(env.headers['X-Dsh-Sig'], exp['signature']);
+    // 自洽校验：用同一套 canonical 规则重算签名，必须与头里的一致。
+    final envBodyHash = _toHex(Sha256.hash(utf8.encode(env.body)));
+    final envCanonical = [
+      'v2',
+      'POST',
+      '/api/mobile/v1/session/send',
+      '?fresh=1',
+      '${env.timestamp}',
+      env.nonce,
+      envBodyHash,
+    ].join('\n');
+    expect(await DshCrypto.sign(keys.sig, envCanonical), env.headers['X-Dsh-Sig']);
     expect(env.nonce, _b64u(_hex(input['bodyNonce'])));
   });
 }
