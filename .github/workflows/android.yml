@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'app/**'
+      - 'scripts/**'
       - 'packages/dsh_link_protocol/**'
       - '.github/workflows/android.yml'
   workflow_dispatch:
@@ -31,6 +32,7 @@ jobs:
         run: |
           cd app
           flutter create --platforms=android --project-name aidock --org com.aidock .
+          python3 ../scripts/patch_android_manifest.py
           flutter pub get
 
       - name: Analyze
@@ -55,10 +57,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-${{ github.run_number }}
-          name: AIDock 测试包 ${GITHUB_SHA::7}
+          name: AIDock 测试包 build ${{ github.run_number }}
           files: out/*.apk
           body: |
             自动构建的 AIDock 安卓安装包。
-            安装包文件：`AIDock-${GITHUB_SHA::7}.apk`
+            安装包文件：`AIDock-${{ github.sha }}.apk`（构建 ${{ github.run_number }}）
           draft: false
           prerelease: true
