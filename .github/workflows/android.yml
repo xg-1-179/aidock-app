@@ -5,6 +5,7 @@ on:
     paths:
       - 'app/**'
       - 'scripts/**'
+      - 'docs/**'
       - 'packages/dsh_link_protocol/**'
       - '.github/workflows/android.yml'
   workflow_dispatch:
