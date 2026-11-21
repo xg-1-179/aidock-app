@@ -140,7 +140,7 @@
 | 容错 | 命令表取不到就不弹（不影响正常发消息） |
 | 人工项 | 真机打 `/` 弹层、点选后光标位置、中文输入法下不出错 |
 
-## 十二、手机通知（审批 / 提问 / 回合结束）
+## 十四、手机通知（审批 / 提问 / 回合结束）
 
 | 项 | 结论 |
 | --- | --- |
@@ -152,7 +152,7 @@
 | 构建验证 | CI 里 `patch_android_notify.py` 覆写 MainActivity 后 `flutter build apk --release` 通过即代表 Kotlin 可用（`android.app.Notification` 平台自带，不依赖 androidx.core） |
 | 人工项 | 真机锁屏/后台时是否弹出、点通知是否能回到 App、Android 13 首次授权框 |
 
-## 十三、深链接（扫面板二维码直接进 App）
+## 十五、深链接（扫面板二维码直接进 App）
 
 | 项 | 结论 |
 | --- | --- |
@@ -161,3 +161,15 @@
 | Dart 侧 | `app/lib/deeplink.dart`（`DeepLink.initial()` / `DeepLink.listen()`）+ 配对页 `_fromDeepLink()`：解析出地址与码后自动填好并直接连 |
 | 与 App 内扫码的关系 | App 内「扫面板二维码」走 `mobile_scanner`（需相机权限）；系统相机扫码走 intent（不需要 App 内相机）。两条路互不冲突 |
 | 人工项 | 用手机系统相机扫面板二维码 → 是否弹出「用 AIDock 打开」→ 打开后是否自动连上 |
+
+## 十六、安全边界与安装验证
+
+| 项 | 结论 |
+| --- | --- |
+| 六位码防爆破 | 插件 `lib/routes/mobile-api.js` 的 `aidockPairGuard`：同一来源 10 分钟内「码不对」满 8 次回 `429`（带 `retry-after`），全机累计失败 20 次删掉 `~/.dsh/aidock-code.json` 让码作废重生成；码对了调 `success()` 清计数，所以手快输错几次不耽误事 |
+| 只数「码不对」 | 码对但封包坏（版本不匹配等）返回 401 但**不计数**，避免正常用户被锁。实测：7 次错码 → 输对 → 再 7 次错码，全程 401 无 429 |
+| 来源识别 | 转发层盖 `x-aidock-edge: 1` 与 `x-aidock-client: <真实对端 IP>`（宿主看到的源地址恒为 `127.0.0.1`）；客户端自带的同名头被丢弃，`x-aidock-code` 保留。换 nginx/frp 时必须补这两枚，否则所有公网请求算同一来源 |
+| 本机专属页 | `/api/mobile/v1/link/code`、`/link/panel`、`/link/qr.svg` 在公网口一律 403（`local-only`），本机 200。带六位码的页面不能从公网读到 |
+| 安装名一致性 | `cordis.patch.yml` 的 `insert: [{ id: dsh-mobile, name: 'aidock' }]` 必须与 `package.json` 的 `name` 一致，否则 Loader 解析不到入口、整棵插件树加载失败；`host.js` 的 `BIN_NAME` 已改为从 `package.json` 读 |
+| 安装实测 | 打 `npm pack` 出的 `aidock-0.1.0.tgz`（294 文件 / 1.8MB）装进全新 profile：`dsh plugin --profile aidocktest add "file:<tgz>"` → `+ aidock 0.1.0`，`bundles: ['@deepseek-ai/dsh-base', 'aidock']`，`node_modules/aidock/lib/index.js` 与改好的 `cordis.patch.yml` 都在位（验证完已删除该临时 profile） |
+| 端到端复验 | 公网口 `t_full.mjs`：`PAIR 200 / SESSIONS 369 / MESSAGES / MODELS / SELECT / PRESETS` 全绿；`/link/info` 200、`/link/code` 403 |
