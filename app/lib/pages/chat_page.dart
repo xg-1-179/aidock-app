@@ -133,7 +133,7 @@ class _ChatPageState extends State<ChatPage> {
       decoration: BoxDecoration(
         color: AidockColors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AidockColors.warn.withValues(alpha: 0.45)),
+        border: Border.all(color: AidockColors.warn.withOpacity(0.45)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
