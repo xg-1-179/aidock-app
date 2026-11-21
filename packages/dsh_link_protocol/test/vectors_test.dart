@@ -21,18 +21,18 @@ void main() {
     File('spec/e2ee-vectors.json').readAsStringSync(),
   ) as Map<String, dynamic>;
   final input = vectors['inputs'] as Map<String, dynamic>;
-  final expect = vectors['expect'] as Map<String, dynamic>;
+  final exp = vectors['expect'] as Map<String, dynamic>;
 
   test('pairKey 派生', () async {
     final key = await DshCrypto.pairKey(_hex(input['ticket']), input['instanceId']);
-    expect(_toHex(key), expect['pairKey']);
+    expect(_toHex(key), exp['pairKey']);
   });
 
   test('会话密钥派生（up/down/sig）', () async {
     final keys = await DshCrypto.sessionKeys(_hex(input['deviceKey']));
-    expect(_toHex(keys.up), expect['keyUp']);
-    expect(_toHex(keys.down), expect['keyDown']);
-    expect(_toHex(keys.sig), expect['keySig']);
+    expect(_toHex(keys.up), exp['keyUp']);
+    expect(_toHex(keys.down), exp['keyDown']);
+    expect(_toHex(keys.sig), exp['keySig']);
   });
 
   test('配对请求封包', () async {
@@ -43,7 +43,7 @@ void main() {
       aad: 'pair|v2|${input['instanceId']}',
       plaintext: utf8.encode(input['pairPlain'] as String),
     );
-    expect(_toHex(sealed), expect['pairSealed']);
+    expect(_toHex(sealed), exp['pairSealed']);
 
     final opened = await DshCrypto.open(
       key: pairKey,
@@ -67,7 +67,7 @@ void main() {
       aad: 'v2|up|$method|$path',
       plaintext: utf8.encode(input['bodyPlain'] as String),
     );
-    expect(_toHex(up), expect['upSealed']);
+    expect(_toHex(up), exp['upSealed']);
 
     final down = await DshCrypto.seal(
       key: keys.down,
@@ -75,7 +75,7 @@ void main() {
       aad: 'v2|down|$method|$path|$ts|$nonceB64u',
       plaintext: utf8.encode(input['responsePlain'] as String),
     );
-    expect(_toHex(down), expect['downSealed']);
+    expect(_toHex(down), exp['downSealed']);
 
     final params = await DshCrypto.seal(
       key: keys.up,
@@ -83,16 +83,16 @@ void main() {
       aad: 'v2|params|$ts|$nonceB64u',
       plaintext: utf8.encode(input['paramsPlain'] as String),
     );
-    expect(_toHex(params), expect['paramsSealed']);
+    expect(_toHex(params), exp['paramsSealed']);
   });
 
   test('签名原文与签名', () async {
     final keys = await DshCrypto.sessionKeys(_hex(input['deviceKey']));
-    final envelopeJson = jsonEncode({'v': 2, 'c': expect['upSealed']}.map(
+    final envelopeJson = jsonEncode({'v': 2, 'c': exp['upSealed']}.map(
       (k, v) => MapEntry(k, v as String),
     ));
     // 官方向量里的 c 是 base64（不是 hex）——用真实封包重算一次更贴近实现。
-    final up = _hex(expect['upSealed'] as String);
+    final up = _hex(exp['upSealed'] as String);
     final body = jsonEncode({'v': 2, 'c': _b64(up)});
     expect(envelopeJson, isNotEmpty);
 
@@ -106,8 +106,8 @@ void main() {
       _b64u(_hex(input['bodyNonce'])),
       bodyHash,
     ].join('\n');
-    expect(canonical, expect['canonical']);
-    expect(await DshCrypto.sign(keys.sig, canonical), expect['signature']);
+    expect(canonical, exp['canonical']);
+    expect(await DshCrypto.sign(keys.sig, canonical), exp['signature']);
   });
 
   test('信封 build 产出的头与体可被同一套规则验签', () async {
@@ -123,7 +123,7 @@ void main() {
       nonce: _u8(_hex(input['bodyNonce'])),
     );
     expect(env.headers['X-Dsh-Nonce'], _b64u(_hex(input['bodyNonce'])));
-    expect(env.headers['X-Dsh-Sig'], expect['signature']);
+    expect(env.headers['X-Dsh-Sig'], exp['signature']);
     expect(env.nonce, _b64u(_hex(input['bodyNonce'])));
   });
 }
