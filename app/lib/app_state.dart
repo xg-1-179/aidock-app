@@ -572,6 +572,8 @@ class AppState extends ChangeNotifier {
     }
     notifyListeners();
     _attachStream(c, item.id);
+    // 顶栏要显示当前模型，进会话就顺手拉一次（失败不阻塞打开）。
+    unawaited(loadModels());
   }
 
   /// 挂上会话流，并在断开时自己重连。
