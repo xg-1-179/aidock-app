@@ -30,10 +30,12 @@ class _SessionsPageState extends State<SessionsPage> {
     final id = state.pendingOpenSession;
     if (id == null || !mounted) return;
     state.pendingOpenSession = null;
+    final hit = state.sessions.where((e) => e.id == id);
+    final title = hit.isEmpty ? '会话' : hit.first.title;
     state.openSessionById(id).then((_) {
       if (!mounted || state.openSessionId == null) return;
       Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (context) => ChatPage(state: state)),
+        MaterialPageRoute<void>(builder: (context) => ChatPage(state: state, title: title)),
       );
     });
   }
