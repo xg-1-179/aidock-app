@@ -503,7 +503,8 @@ class _QuestionDockState extends State<_QuestionDock> {
       for (final q in widget.card.questions)
         if ((_customs[q.id]?.text ?? '').trim().isNotEmpty) q.id: _customs[q.id]!.text.trim(),
     };
-    await widget.state.answerQuestion(widget.card, _picks, customs: customs);
+    final picks = <String, List<String>>{for (final e in _picks.entries) e.key: e.value.toList()};
+    await widget.state.answerQuestion(widget.card, picks, customs: customs);
     if (mounted) setState(() => _sending = false);
   }
 

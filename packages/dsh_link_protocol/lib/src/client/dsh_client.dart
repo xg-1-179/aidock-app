@@ -352,6 +352,21 @@ class DshClient {
   Future<Map<String, dynamic>> stop(String sessionId) =>
       call('POST', '$_prefix/link/session/stop', payload: {'sessionId': sessionId});
 
+  /// 回答宿主抛来的提问卡（`ask_user_question`）。
+  ///
+  /// `answers` 每题恰好一条：`{id, selected:[label...], custom?}`。宿主按题数严格校验，
+  /// 少一条或多一条都回 400（见 `lib/mobile/questions.js` 的 `normalizeAnswers`）。
+  Future<Map<String, dynamic>> respondQuestion({
+    required String rpcId,
+    required String sessionId,
+    required List<Map<String, dynamic>> answers,
+  }) =>
+      call('POST', '$_prefix/link/question/respond', payload: {
+        'rpcId': rpcId,
+        'sessionId': sessionId,
+        'answer': {'answers': answers},
+      });
+
   /// 这条会话现在能用哪些模型（provider / model / 推理档位）。
   Future<Map<String, dynamic>> models(String sessionId) => call(
         'GET',
