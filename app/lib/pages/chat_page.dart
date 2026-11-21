@@ -283,7 +283,7 @@ class _ChatPageState extends State<ChatPage> {
                       tooltip: '发图片',
                       onPressed: _pickImage,
                       icon: const Icon(Icons.image_outlined, size: 22),
-                      color: AidockColors.muted,
+                      color: AidockColors.textDim,
                     ),
                   ),
                   const SizedBox(width: 6),
