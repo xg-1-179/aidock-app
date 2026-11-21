@@ -81,7 +81,7 @@ class MockHost {
       return;
     }
 
-    if (path == '/api/mobile/v1/session/stream') {
+    if (path.endsWith('/session/stream')) {
       // 会话流是 SSE：一帧一条 `data:`，帧信封的 AAD 钉着「路径 + 请求 ts/nonce + 帧序号」。
       final ts = req.headers.value('x-dsh-ts') ?? '';
       final nonce = req.headers.value('x-dsh-nonce') ?? '';
