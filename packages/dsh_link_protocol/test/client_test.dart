@@ -68,7 +68,7 @@ class MockHost {
       plaintext: utf8.encode(jsonEncode({'kind': 'assistant.delta', 'text': '你好'})),
         aad: 'v2|stream|${req.uri.queryParameters['sessionId']}',
       );
-      ws.add(jsonEncode({'v': 2, 'c': base64.encode(sealed)}));
+      ws.add(jsonEncode({'v': 2, 'n': base64Url.encode(sealed.sublist(0, 12)).replaceAll('=', ''), 'c': base64.encode(sealed.sublist(12))}));
       await ws.close();
       return;
     }
@@ -89,7 +89,7 @@ class MockHost {
       'v2',
       req.method,
       path,
-      req.uri.query,
+      req.uri.hasQuery ? '?${req.uri.query}' : '',
       '$ts',
       nonce,
       await DshCrypto.sha256HexOfEnvelope(body),
@@ -128,7 +128,7 @@ class MockHost {
       plaintext: utf8.encode(jsonEncode(out)),
       aad: downAad,
     );
-    _json(req, {'v': 2, 'c': base64.encode(sealed)});
+    _json(req, {'v': 2, 'n': base64Url.encode(sealed.sublist(0, 12)).replaceAll('=', ''), 'c': base64.encode(sealed.sublist(12))});
   }
 
   void _json(HttpRequest req, Object body) {

@@ -56,7 +56,9 @@ class DshEnvelope {
       'v2',
       method.toUpperCase(),
       path,
-      query.startsWith('?') ? query.substring(1) : query,
+      // 服务端按线上原样签（QUERY 含前导 `?`，见 lib/shared/e2ee-request.js 的 signedQuery），
+      // 这里必须一字不差地跟着签，去掉问号会直接 e2ee-bad-signature。
+      query,
       '$ts',
       nB64u,
       bodyHash,

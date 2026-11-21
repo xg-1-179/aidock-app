@@ -144,6 +144,12 @@ class DshClient {
     }
     final c = json['c'];
     if (c is! String) return json; // 明文响应（health/status 之类）
+    // 下行信封的形状是 `{n, c, z?}`：`n` 是 base64url 的 nonce，`c` 是 base64 的密文+tag。
+    // 两者必须拼回 `nonce||ct||tag` 才能解 —— 只取 `c` 会一直 AEAD 认证失败（实测）。
+    final sealedBytes = <int>[
+      ...(json['n'] is String ? base64Url.decode(base64Url.normalize(json['n'] as String)) : const <int>[]),
+      ...base64.decode(c),
+    ];
     final aads = <String>[
       ...extraAads,
       'v2|down|${method.toUpperCase()}|$path|${env.timestamp}|${env.nonce}',
@@ -153,7 +159,7 @@ class DshClient {
       try {
         final clear = await DshCrypto.open(
           key: keys.down,
-          sealed: base64.decode(c),
+          sealed: sealedBytes,
           aad: aad,
         );
         return jsonDecode(utf8.decode(clear)) as Map<String, dynamic>;
