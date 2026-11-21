@@ -139,3 +139,15 @@
 | 发送 | 走普通 `session/send`；宿主见到「单个 text 块且以 / 开头」会当 Slash 命令派发（回包 `handledAs:'command'`） |
 | 容错 | 命令表取不到就不弹（不影响正常发消息） |
 | 人工项 | 真机打 `/` 弹层、点选后光标位置、中文输入法下不出错 |
+
+## 十二、手机通知（审批 / 提问 / 回合结束）
+
+| 项 | 结论 |
+| --- | --- |
+| 做法 | 不引第三方通知插件，直接改生成的 `MainActivity`：`scripts/patch_android_notify.py` 写入 `MethodChannel('aidock/notify')`，只在 `configureFlutterEngine` 里注册 |
+| 权限 | manifest 加 `POST_NOTIFICATIONS`；Android 13+ 启动时 `Notifier.ask()` 弹一次系统授权，拒了不影响其它功能 |
+| 触发条件 | 只有 App 退到后台（`appForeground == false`）才发：① 新的审批卡（去重后首次入列）② 新的提问卡 ③ `turn/end` 且这一轮是手机发起的 |
+| 文案 | 审批「需要你批准：<工具名>」+ fact；提问「电脑在等你回答」+ 第一句问题；回合结束「这一轮跑完了」+ 最后一条回复前 80 字 |
+| 实现 | `app/lib/notify.dart` 的 `Notifier.ask()/show()`，全 try/catch（桌面或测试环境没有通道时静默）；`app/lib/main.dart` 用 `WidgetsBindingObserver` 维护 `appForeground` |
+| 构建验证 | CI 里 `patch_android_notify.py` 覆写 MainActivity 后 `flutter build apk --release` 通过即代表 Kotlin 可用（`android.app.Notification` 平台自带，不依赖 androidx.core） |
+| 人工项 | 真机锁屏/后台时是否弹出、点通知是否能回到 App、Android 13 首次授权框 |
