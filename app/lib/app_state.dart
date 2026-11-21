@@ -8,10 +8,19 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ChatMessage {
-  ChatMessage({required this.role, required this.text, this.streaming = false});
+  ChatMessage({
+    required this.role,
+    required this.text,
+    this.streaming = false,
+    List<String>? images,
+  }) : images = images ?? <String>[];
   final String role;
   String text;
   bool streaming;
+
+  /// 这一条里带的图片（base64 原字节）；历史里按 `attachmentId` 现取，
+  /// 取不到就是空列表，气泡里仍显示「（图片）」占位。
+  List<String> images;
 }
 
 /// 选项：宿主给 `{label, description?}`，老形态可能只给字符串。
@@ -597,6 +606,7 @@ class AppState extends ChangeNotifier {
     // 先补历史，再挂流：流只负责「打开之后」发生的事，历史由 /session/messages 给。
     try {
       final rows = await c.messages(item.id, limit: 40);
+      final pending = <int, List<String>>{};
       for (final row in rows) {
         final role = '${row['role'] ?? row['author'] ?? ''}';
         final text = _textOfMessage(row);
@@ -605,7 +615,10 @@ class AppState extends ChangeNotifier {
         if (id.isNotEmpty) _seenIds.add(id);
         final mine = role == 'user' || role == 'human';
         messages.add(ChatMessage(role: mine ? 'user' : 'assistant', text: text));
+        final ids = _attachmentIdsOf(row);
+        if (ids.isNotEmpty) pending[messages.length - 1] = ids;
       }
+      if (pending.isNotEmpty) unawaited(_hydrateImages(c, item.id, pending));
       if (messages.isEmpty) {
         messages.add(ChatMessage(role: 'system', text: '这个会话还没有消息'));
       }
@@ -907,6 +920,50 @@ class AppState extends ChangeNotifier {
   }
 
   /// 从一条消息对象里取纯文本：`content` 可能是字符串，也可能是 `[{type:'text',text}]`。
+  /// 这一条消息里带了哪些图片附件（历史里图块只有 id，没有字节）。
+  static List<String> _attachmentIdsOf(Map<String, dynamic> row) {
+    final blocks = row['blocks'];
+    if (blocks is! List) return const [];
+    final ids = <String>[];
+    for (final b in blocks) {
+      if (b is! Map) continue;
+      if ('${b['type']}' != 'image') continue;
+      final id = '${b['attachmentId'] ?? ''}'.trim();
+      if (id.isNotEmpty && !ids.contains(id)) ids.add(id);
+    }
+    return ids;
+  }
+
+  /// 按 id 把图片字节抓回来填进气泡。
+  ///
+  /// 一屏最多补 8 张（一张 200KB 就够呛），失败静默——气泡里本来就有「（图片）」占位。
+  Future<void> _hydrateImages(
+    DshClient c,
+    String sessionId,
+    Map<int, List<String>> pending,
+  ) async {
+    var budget = 8;
+    for (final entry in pending.entries) {
+      if (budget <= 0) return;
+      if (entry.key >= messages.length) continue;
+      final got = <String>[];
+      for (final id in entry.value) {
+        if (budget <= 0) break;
+        budget -= 1;
+        try {
+          final res = await c.attachment(sessionId: sessionId, attachmentId: id);
+          final data = '${res['data'] ?? ''}';
+          if (data.isNotEmpty) got.add(data);
+        } catch (_) {
+          // 附件被会话清理掉（404）是常态，不打扰用户。
+        }
+      }
+      if (got.isEmpty) continue;
+      messages[entry.key].images = got;
+      notifyListeners();
+    }
+  }
+
   static String _textOfMessage(Map<String, dynamic> msg) {
     final blocks0 = msg['blocks'];
     final imageCount = blocks0 is List
@@ -1038,11 +1095,12 @@ class AppState extends ChangeNotifier {
       messages.clear();
     }
     final body = text.trim();
+    final encoded = base64Encode(bytes);
     final content = <Map<String, dynamic>>[
       if (body.isNotEmpty) {'type': 'text', 'text': body},
       {
         'type': 'image',
-        'data': base64Encode(bytes),
+        'data': encoded,
         'mediaType': mediaType,
         'name': name,
       },
@@ -1050,6 +1108,7 @@ class AppState extends ChangeNotifier {
     messages.add(ChatMessage(
       role: 'user',
       text: body.isEmpty ? '（图片）$name' : '$body\n（图片）$name',
+      images: [encoded],
     ));
     streamingNow = true;
     notifyListeners();

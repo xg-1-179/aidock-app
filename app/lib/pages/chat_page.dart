@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import 'package:image_picker/image_picker.dart';
@@ -429,10 +432,53 @@ class _ChatPageState extends State<ChatPage> {
   ///
   /// 不引第三方 Markdown 包：一是依赖越少构建越稳，二是手机窄屏上真正常用的只有
   /// 代码块、行内代码和粗体这三样，手写一遍比调包更好控行高与配色。
+  /// 气泡里的图片：历史图按 `attachmentId` 现取（`AppState._hydrateImages`），
+  /// 自己刚发的那张直接用本地字节，所以一发出就能看见。
+  Widget _images(ChatMessage m) {
+    if (m.images.isEmpty) return const SizedBox.shrink();
+    final children = <Widget>[];
+    for (final b64 in m.images.take(4)) {
+      Uint8List bytes;
+      try {
+        bytes = base64Decode(b64);
+      } catch (_) {
+        continue;
+      }
+      children.add(ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.memory(
+          bytes,
+          width: 220,
+          fit: BoxFit.contain,
+          gaplessPlayback: true,
+          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+        ),
+      ));
+    }
+    if (children.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+    );
+  }
+
   Widget _body(ChatMessage m, bool mine) {
     final text = m.text.isEmpty && m.streaming ? '…' : m.text;
     final color = mine ? const Color(0xFF06121F) : AidockColors.text;
     final base = TextStyle(fontSize: 14, height: 1.5, color: color);
+    if (m.images.isNotEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _images(m),
+          _plainOrCode(text, mine, color, base),
+        ],
+      );
+    }
+    return _plainOrCode(text, mine, color, base);
+  }
+
+  Widget _plainOrCode(String text, bool mine, Color color, TextStyle base) {
     if (mine || !text.contains('```')) {
       return Text.rich(TextSpan(children: _inline(text, color)), style: base);
     }

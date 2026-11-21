@@ -280,6 +280,16 @@ class DshClient {
   }
 
   /// 会话历史：进入对话先拉最近 N 条（`thin=1` 让宿主按轮裁掉过程块）。
+  /// 取一张历史图（`blocks` 里只带 `attachmentId`，字节要单独要）。
+  ///
+  /// 宿主回 `{ok, mediaType, data:<base64>, name?}`；附件被会话清理掉时回 404。
+  Future<Map<String, dynamic>> attachment({
+    required String sessionId,
+    required String attachmentId,
+  }) =>
+      call('POST', '$_prefix/link/session/attachment',
+          payload: {'sessionId': sessionId, 'attachmentId': attachmentId});
+
   Future<List<Map<String, dynamic>>> messages(
     String sessionId, {
     int limit = 50,

@@ -80,6 +80,7 @@
 | 回答体 | `{rpcId, sessionId, answer:{answers:[{id, selected:[label...], custom?}]}}`，每题恰好一条，否则 400；无挂起项回 409 |
 | 探针实测 | 新建会话 → 让 agent 调 `ask_user_question` → 收到 `question/requested`（题 `color`，选项「红色/蓝色」）→ `POST /link/question/respond` **200 accepted** → 帧流出现 `question/resolved` → `turn/end`，整轮跑完 |
 | 客户端 | `DshClient.respondQuestion`、`AppState.answerQuestion`、`_onFrame` 两分支（upsert / 移除）、`_QuestionDock` 单选/多选/自由输入 |
+| 附件接口 | `POST /api/mobile/v1/link/session/attachment`（`{sessionId, attachmentId}` → `{ok, mediaType, data:<base64>, name}`；实测 200 / `image/png` / 124 字节 base64） |
 | 人工项 | 真机上点选与提交（io 无模拟器） |
 
 ## 九、二维码连接
@@ -103,5 +104,5 @@
 | 宿主限制 | 明文 8MB / 线上 10.7MB；图片块带 `data` 就直接内联，不必走 uploadId |
 | 实测（公网 41873） | `SEND 200 {"ok":true,"accepted":true}`；随后 `/link/messages` 出现 `role:user` 且 `blocks=text|image`，模型答「红色」→ 图确实进了模型 |
 | 失败形状 | 图片数据不可解码时宿主回 `400 {"code":"session/attachment-invalid","reason":"INVALID_IMAGE"}`（我第一次用坏 base64 试出来的） |
-| 显示 | 历史里带图无正文的轮次显示「（图片）」/「（N 张图片）」，避免空气泡；气泡内暂不内嵌缩略图 |
+| 显示 | 历史里带图无正文的轮次显示「（图片）」/「（N 张图片）」；气泡内按 `attachmentId` 现取字节渲染缩略图（一屏最多补 8 张，取不到就退回文字占位） |
 | 人工项 | 真机相册选图（有系统的权限弹窗）、超大图（>8MB 原图）会被压缩后再发 |
