@@ -56,7 +56,7 @@ class DshEnvelope {
       'v2',
       method.toUpperCase(),
       path,
-      query,
+      query.startsWith('?') ? query.substring(1) : query,
       '$ts',
       nB64u,
       bodyHash,

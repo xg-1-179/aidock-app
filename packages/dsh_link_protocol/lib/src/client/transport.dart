@@ -57,7 +57,11 @@ class IoDshTransport implements DshTransport {
     final uri = _uri(path, query);
     final req = await _client.openUrl(method, uri).timeout(_timeout);
     headers.forEach(req.headers.set);
-    req.add(utf8.encode(body));
+    final bytes = utf8.encode(body);
+    if (bytes.isNotEmpty) {
+      req.contentLength = bytes.length;
+      req.add(bytes);
+    }
     final res = await req.close().timeout(_timeout);
     final text = await utf8.decoder.bind(res).join().timeout(_timeout);
     return DshHttpResponse(res.statusCode, text);
