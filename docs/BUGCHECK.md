@@ -70,3 +70,14 @@
 - [x] **流式收尾不重复正文**：`assistant/message` 只在「还在流式 / 文本相同 / 是流式文本的
       全量版本」时归到同一个气泡，否则才新起一条。
 - [x] **重连横幅不赖着不走**：挂上流就先收掉「正在自动重连…」，不必等 15 秒后的心跳帧。
+
+## 八、提问卡（ask_user_question）端到端
+
+| 项 | 结论 |
+| --- | --- |
+| 插件别名 | `/api/mobile/v1/link/question/respond` → `questions.handleQuestionRespond`，权限表映射 `V.APPROVE` |
+| 帧契约 | `question/requested`（`rpcId` 在帧级、`questions[]` 在 payload）、`question/resolved`（`questionRpcId`） |
+| 回答体 | `{rpcId, sessionId, answer:{answers:[{id, selected:[label...], custom?}]}}`，每题恰好一条，否则 400；无挂起项回 409 |
+| 探针实测 | 新建会话 → 让 agent 调 `ask_user_question` → 收到 `question/requested`（题 `color`，选项「红色/蓝色」）→ `POST /link/question/respond` **200 accepted** → 帧流出现 `question/resolved` → `turn/end`，整轮跑完 |
+| 客户端 | `DshClient.respondQuestion`、`AppState.answerQuestion`、`_onFrame` 两分支（upsert / 移除）、`_QuestionDock` 单选/多选/自由输入 |
+| 人工项 | 真机上点选与提交（io 无模拟器） |
