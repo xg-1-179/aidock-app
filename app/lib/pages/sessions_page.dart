@@ -42,6 +42,22 @@ class SessionsPage extends StatelessWidget {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: state.busy
+            ? null
+            : () async {
+                await state.createSession();
+                if (!context.mounted) return;
+                if (state.openSessionId == null) return;
+                Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => ChatPage(state: state, title: '新会话'),
+                ));
+              },
+        backgroundColor: AidockColors.accent,
+        foregroundColor: Colors.black,
+        icon: const Icon(Icons.add_comment_rounded, size: 19),
+        label: const Text('新建会话', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      ),
       body: RefreshIndicator(
         onRefresh: state.refreshSessions,
         color: AidockColors.accent,

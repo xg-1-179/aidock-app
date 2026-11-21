@@ -315,6 +315,42 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 在电脑上新开一个会话，再刷新列表并直接打开它。
+  ///
+  /// 不传落点＝落到宿主的默认工作区：手机上没有「选目录」的必要，先把「点一下就能聊」
+  /// 打通；要指定项目时再从会话页传 `workspaceId`/`cwd`。
+  Future<void> createSession() async {
+    final c = _client;
+    if (c == null) return;
+    busy = true;
+    notifyListeners();
+    try {
+      final created = await c.newSession();
+      final id = '${created['sessionId'] ?? created['id'] ?? ''}';
+      final cwd = '${created['cwd'] ?? ''}';
+      await refreshSessions();
+      if (id.isNotEmpty) {
+        await openSession(SessionItem(
+          id: id,
+          title: '新会话',
+          subtitle: cwd,
+          updatedAt: DateTime.now(),
+          running: false,
+          pending: false,
+          failed: false,
+          pinned: false,
+        ));
+      }
+      error = null;
+    } on DshClientException catch (e) {
+      error = '新建会话失败：${e.message}（HTTP ${e.status}）';
+    } catch (e) {
+      error = '新建会话失败：$e';
+    }
+    busy = false;
+    notifyListeners();
+  }
+
   Future<void> openSession(SessionItem item) async {
     await _sub?.cancel();
     _sub = null;
@@ -499,7 +535,7 @@ class AppState extends ChangeNotifier {
         break;
       case 'approval/requested':
         final card = ApprovalCard(
-          rpcId: '${inner['rpcId'] ?? ''}',
+          rpcId: '${inner['rpcId'] ?? payload['rpcId'] ?? ''}',
           sessionId: '${inner['sessionId'] ?? openSessionId ?? ''}',
           approvalId: '${inner['approvalId'] ?? ''}',
           toolName: '${inner['toolName'] ?? ''}',

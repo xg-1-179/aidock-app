@@ -271,6 +271,22 @@ class DshClient {
         payload: {'sessionId': sessionId, 'text': text},
       );
 
+  /// 在电脑上新建一个会话。
+  ///
+  /// 宿主要求落点二者之一：`workspaceId`（已登记工作区）或 `cwd`（必须在某个已登记
+  /// 工作区之内，否则 400 `bad-request`）。都不给就落到宿主的默认工作区，手机侧
+  /// 只想要「点一下就开始聊」时走这条。
+  Future<Map<String, dynamic>> newSession({
+    String? workspaceId,
+    String? cwd,
+    bool isolate = false,
+  }) =>
+      call('POST', '$_prefix/link/session/new', payload: {
+        if (workspaceId != null && workspaceId.isNotEmpty) 'workspaceId': workspaceId,
+        if (cwd != null && cwd.isNotEmpty) 'cwd': cwd,
+        if (isolate) 'isolate': true,
+      });
+
   /// 打断当前正在跑的回合。
   Future<Map<String, dynamic>> stop(String sessionId) =>
       call('POST', '$_prefix/link/session/stop', payload: {'sessionId': sessionId});
