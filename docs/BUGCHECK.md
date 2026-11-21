@@ -81,3 +81,15 @@
 | 探针实测 | 新建会话 → 让 agent 调 `ask_user_question` → 收到 `question/requested`（题 `color`，选项「红色/蓝色」）→ `POST /link/question/respond` **200 accepted** → 帧流出现 `question/resolved` → `turn/end`，整轮跑完 |
 | 客户端 | `DshClient.respondQuestion`、`AppState.answerQuestion`、`_onFrame` 两分支（upsert / 移除）、`_QuestionDock` 单选/多选/自由输入 |
 | 人工项 | 真机上点选与提交（io 无模拟器） |
+
+## 九、二维码连接
+
+| 项 | 结论 |
+| --- | --- |
+| 插件 | `GET /api/mobile/v1/link/qr.svg?w=320` 用 `qrcode@1.5.4` 渲染，内容 `aidock://v1?h=<地址>&c=<六位码>&i=<实例>` |
+| 面板 | `renderPanel` 内嵌 `<img src="…/qr.svg?w=352">`，码轮换时按 `lastCode` 变化重取（带 `t=` 破缓存） |
+| App | `ScanPage`（`mobile_scanner ^5.2.3`）只认 `aidock://` 前缀，扫到后回填地址与六位码并直接连接；其它二维码提示「这不是 AIDock 的连接码」 |
+| 权限 | `patch_android_manifest.py` 增加 `CAMERA` 与 `android.hardware.camera required=false` |
+| 安全 | 公网口 `/link/qr.svg`、`/link/panel`、`/link/code` 均 403（转发器 `LOCAL_ONLY` + 插件 `x-aidock-edge` 双层），`X-Aidock-Code` 头保留 |
+| 实测 | 本机 qr.svg 200（2,423 字节 SVG）；公网三条路由 403、`/health` 200；payload 经 URL 解析回填 `h=http://101.43.213.201:41873`、`c=859603` |
+| 人工项 | 真机相机扫码（io 无摄像头） |
