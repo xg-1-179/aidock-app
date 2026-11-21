@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../app_state.dart';
 import '../theme.dart';
+import 'scan_page.dart';
 
 class PairPage extends StatefulWidget {
   const PairPage({super.key, required this.state});
@@ -78,6 +79,19 @@ class _PairPageState extends State<PairPage> {
     );
   }
 
+  /// 扫二维码：把地址与六位码一起填好并直接连，省掉手输。
+  Future<void> _scan() async {
+    final link = await Navigator.of(context).push<ScannedLink>(
+      MaterialPageRoute(builder: (_) => const ScanPage()),
+    );
+    if (link == null || !mounted) return;
+    setState(() {
+      _host.text = link.host;
+      _code.text = link.code;
+    });
+    _submit();
+  }
+
   void _submit() {
     if (_code.text.trim().length < 4) {
       _codeFocus.requestFocus();
@@ -134,6 +148,21 @@ class _PairPageState extends State<PairPage> {
               const SelectableText('电脑上打开：http://127.0.0.1:3080/api/mobile/v1/link/panel',
                   style: TextStyle(fontSize: 11.5, color: AidockColors.textDim, height: 1.5,
                       fontFamily: 'monospace')),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: s.busy ? null : _scan,
+                  icon: const Icon(Icons.qr_code_scanner, size: 18),
+                  label: const Text('扫面板上的二维码（免手输）', style: TextStyle(fontSize: 13)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AidockColors.accent,
+                    side: BorderSide(color: AidockColors.accent.withOpacity(0.5)),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
               const SizedBox(height: 20),
               _label('电脑地址'),
               const SizedBox(height: 8),
