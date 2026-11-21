@@ -22,7 +22,7 @@ class SessionItem {
 }
 
 class AppState extends ChangeNotifier {
-  final IoDshTransport _transport = IoDshTransport();
+  IoDshTransport? _transport;
 
   DshClient? _client;
   DshClient? get client => _client;
@@ -69,7 +69,10 @@ class AppState extends ChangeNotifier {
     try {
       final base = normalizeHost(rawHost);
       hostLabel = '${base.host}:${base.port}';
-      final info = await _transport.send(
+      _transport?.close();
+      final transport = IoDshTransport(base);
+      _transport = transport;
+      final info = await transport.send(
         method: 'GET',
         path: '/api/mobile/v1/link/info',
         query: '',
@@ -88,7 +91,7 @@ class AppState extends ChangeNotifier {
       final keyId = _hex(_randomBytes(8));
       final result = await DshClient.pair(
         baseUrl: base,
-        transport: _transport,
+        transport: transport,
         ticket: utf8.encode(code.trim()),
         instanceId: instanceId!,
         deviceKey: deviceKey,
@@ -225,6 +228,8 @@ class AppState extends ChangeNotifier {
     await _sub?.cancel();
     _sub = null;
     _client = null;
+    _transport?.close();
+    _transport = null;
     paired = false;
     sessions.clear();
     messages.clear();
@@ -235,7 +240,7 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _sub?.cancel();
-    _transport.close();
+    _transport?.close();
     super.dispose();
   }
 }
