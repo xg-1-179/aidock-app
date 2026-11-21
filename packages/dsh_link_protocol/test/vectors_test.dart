@@ -88,13 +88,9 @@ void main() {
 
   test('签名原文与签名', () async {
     final keys = await DshCrypto.sessionKeys(_hex(input['deviceKey']));
-    final envelopeJson = jsonEncode({'v': 2, 'c': exp['upSealed']}.map(
-      (k, v) => MapEntry(k, v as String),
-    ));
     // 官方向量里的 c 是 base64（不是 hex）——用真实封包重算一次更贴近实现。
     final up = _hex(exp['upSealed'] as String);
     final body = jsonEncode({'v': 2, 'c': _b64(up)});
-    expect(envelopeJson, isNotEmpty);
 
     final bodyHash = _toHex(Sha256.hash(utf8.encode(body)));
     final canonical = [
