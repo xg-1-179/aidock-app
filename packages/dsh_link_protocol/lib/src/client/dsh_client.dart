@@ -144,7 +144,7 @@ class DshClient {
       json = jsonDecode(body);
     } catch (_) {
       // 空体或非 JSON（网关页、401 不带体）：按状态码抛，而不是让 FormatException 冒上去。
-      throw DshClientException('响应不是 JSON（HTTP $status）', status: res.status, body: body);
+      throw DshClientException('响应不是 JSON', body: body);
     }
     if (json is! Map<String, dynamic>) {
       throw DshClientException('unexpected body shape');
