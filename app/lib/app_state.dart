@@ -207,7 +207,7 @@ class AppState extends ChangeNotifier {
             )).where((e) => e.id.isNotEmpty));
       error = null;
     } on DshClientException catch (e) {
-      error = e.status == 500 && e.body.contains('apiProxy')
+      error = e.status == 500 && (e.body ?? '').contains('apiProxy')
           ? '电脑端插件还没加载完（缺少宿主接口），需要重启一次 DSH 再连'
           : '读取会话失败：${e.message}（HTTP ${e.status}）';
     } catch (e) {
