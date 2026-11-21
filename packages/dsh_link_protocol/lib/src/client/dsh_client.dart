@@ -237,7 +237,7 @@ class DshClient {
   }) {
     return call(
       'POST',
-      '$_prefix/approval/respond',
+      '$_prefix/link/approval/respond',
       payload: {
         'rpcId': rpcId,
         'sessionId': sessionId,
@@ -256,14 +256,14 @@ class DshClient {
   }) =>
       call(
         'POST',
-        '$_prefix/session/send',
+        '$_prefix/link/session/send',
         query: fresh ? '?fresh=1' : '',
         payload: {'sessionId': sessionId, 'text': text},
       );
 
   /// 打断当前正在跑的回合。
   Future<Map<String, dynamic>> stop(String sessionId) =>
-      call('POST', '$_prefix/session/stop', payload: {'sessionId': sessionId});
+      call('POST', '$_prefix/link/session/stop', payload: {'sessionId': sessionId});
 
   /// 会话流：服务端是 SSE（`text/event-stream`），不是 WebSocket。
   ///
@@ -271,7 +271,7 @@ class DshClient {
   /// 信封。信封的 AAD 钉死了「路径 + 本次请求的 ts/nonce + 帧序号」：
   /// `v2|down|sse|<path>|<ts>|<nonce>|<seq>`，序号从 1 起、宿主自己数。
   Stream<Map<String, dynamic>> stream(String sessionId) async* {
-    const path = '$_prefix/session/stream';
+    const path = '$_prefix/link/session/stream';
     final query = '?sessionId=$sessionId';
     final env = await DshEnvelope.build(
       keys: keys,
