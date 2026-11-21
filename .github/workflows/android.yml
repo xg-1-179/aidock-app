@@ -11,6 +11,8 @@ on:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -48,3 +50,15 @@ jobs:
           name: aidock-apk
           path: out/*.apk
           if-no-files-found: error
+
+      - name: Publish APK to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: AIDock 测试包 ${GITHUB_SHA::7}
+          files: out/*.apk
+          body: |
+            自动构建的 AIDock 安卓安装包。
+            安装包文件：`AIDock-${GITHUB_SHA::7}.apk`
+          draft: false
+          prerelease: true
