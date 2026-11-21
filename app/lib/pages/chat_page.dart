@@ -25,6 +25,102 @@ class _ChatPageState extends State<ChatPage> {
     super.dispose();
   }
 
+  /// 模型选择：宿主给的 groups 里按厂商分组列出来，点一条就只切这条会话。
+  Future<void> _pickModel() async {
+    final s = widget.state;
+    await s.loadModels();
+    if (!mounted) return;
+    final info = s.modelInfo;
+    if (info == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('拿不到模型清单，稍后再试')),
+      );
+      return;
+    }
+    final groups = (info['groups'] as List?)?.whereType<Map<String, dynamic>>().toList() ??
+        const <Map<String, dynamic>>[];
+    final cur = info['current'];
+    final curProvider = cur is Map ? '${cur['provider'] ?? ''}' : '';
+    final curModel = cur is Map ? '${cur['model'] ?? ''}' : '';
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AidockColors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.72),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+                child: Row(
+                  children: [
+                    const Text('选择模型',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                    const Spacer(),
+                    if (s.loadingModels)
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                  ],
+                ),
+              ),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final g in groups) ...<Widget>[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
+                        child: Text(
+                          '${g['name'] ?? g['id']}',
+                          style: const TextStyle(
+                              fontSize: 11, color: AidockColors.textDim, letterSpacing: .5),
+                        ),
+                      ),
+                      for (final m in (g['models'] as List?)
+                              ?.whereType<Map<String, dynamic>>()
+                              .toList() ??
+                          const <Map<String, dynamic>>[])
+                        ListTile(
+                          dense: true,
+                          title: Text('${m['name'] ?? m['id']}',
+                              style: const TextStyle(fontSize: 14)),
+                          subtitle: m['description'] == null
+                              ? null
+                              : Text(
+                                  '${m['description']}',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                          trailing: ('${g['id']}' == curProvider &&
+                                  '${m['id']}' == curModel)
+                              ? const Icon(Icons.check, size: 18, color: AidockColors.accent)
+                              : null,
+                          onTap: () async {
+                            Navigator.of(ctx).pop();
+                            await s.chooseModel('${g['id']}', '${m['id']}');
+                          },
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _send() {
     final text = _input.text;
     if (text.trim().isEmpty) return;
@@ -81,6 +177,14 @@ class _ChatPageState extends State<ChatPage> {
       appBar: AppBar(
         title: Text(widget.title, overflow: TextOverflow.ellipsis),
         actions: [
+          TextButton.icon(
+            onPressed: s.openSessionId == null ? null : _pickModel,
+            icon: const Icon(Icons.memory, size: 17, color: AidockColors.textDim),
+            label: Text(
+              s.modelLabel,
+              style: const TextStyle(fontSize: 12, color: AidockColors.textDim),
+            ),
+          ),
           if (s.streamingNow)
             TextButton.icon(
               onPressed: s.stopTurn,

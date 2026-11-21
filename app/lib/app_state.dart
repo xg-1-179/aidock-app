@@ -413,6 +413,68 @@ class AppState extends ChangeNotifier {
     return '';
   }
 
+  /// 当前会话的模型快照（宿主原样给的）。
+  Map<String, dynamic>? modelInfo;
+  bool loadingModels = false;
+
+  /// 顶栏显示用：当前模型名，拿不到就退回「模型」。
+  String get modelLabel {
+    final cur = modelInfo?['current'];
+    if (cur is Map && cur['model'] is String) return '${cur['model']}';
+    return '模型';
+  }
+
+  Future<void> loadModels() async {
+    final c = _client;
+    final sid = openSessionId;
+    if (c == null || sid == null) return;
+    loadingModels = true;
+    notifyListeners();
+    try {
+      modelInfo = await c.models(sid);
+    } on DshClientException catch (e) {
+      if (_isAuthError(e)) _stopForAuth();
+      modelInfo = null;
+    } catch (_) {
+      modelInfo = null;
+    }
+    loadingModels = false;
+    notifyListeners();
+  }
+
+  Future<void> chooseModel(String provider, String model, {String? effort}) async {
+    final c = _client;
+    final sid = openSessionId;
+    if (c == null || sid == null) return;
+    final prev = modelInfo;
+    // 乐观更新：宿主拒绝时回滚，别让顶栏一直挂着旧名字。
+    modelInfo = <String, dynamic>{
+      ...?prev,
+      'current': <String, dynamic>{
+        'provider': provider,
+        'model': model,
+        if (effort != null && effort.isNotEmpty) 'reasoningEffort': effort,
+      },
+    };
+    notifyListeners();
+    try {
+      await c.selectModel(sid, provider, model, reasoningEffort: effort);
+      await loadModels();
+      error = null;
+    } on DshClientException catch (e) {
+      modelInfo = prev;
+      if (_isAuthError(e)) {
+        _stopForAuth();
+      } else {
+        error = '切换模型失败：${e.message}';
+      }
+    } catch (e) {
+      modelInfo = prev;
+      error = '切换模型失败：$e';
+    }
+    notifyListeners();
+  }
+
   Future<void> refreshSessions() async {
     final c = _client;
     if (c == null) return;

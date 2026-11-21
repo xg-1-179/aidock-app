@@ -333,6 +333,47 @@ class DshClient {
   Future<Map<String, dynamic>> stop(String sessionId) =>
       call('POST', '$_prefix/link/session/stop', payload: {'sessionId': sessionId});
 
+  /// 这条会话现在能用哪些模型（provider / model / 推理档位）。
+  Future<Map<String, dynamic>> models(String sessionId) => call(
+        'GET',
+        '$_prefix/link/session/models',
+        query: '?sessionId=${Uri.encodeQueryComponent(sessionId)}',
+      );
+
+  /// 只切「当前会话」的模型，电脑端默认不变。
+  Future<Map<String, dynamic>> selectModel(
+    String sessionId,
+    String provider,
+    String model, {
+    String? reasoningEffort,
+  }) =>
+      call('POST', '$_prefix/link/session/select-model', payload: {
+        'sessionId': sessionId,
+        'provider': provider,
+        'model': model,
+        if (reasoningEffort != null && reasoningEffort.isNotEmpty) 'reasoningEffort': reasoningEffort,
+      });
+
+  /// 斜杠命令表。
+  Future<List<Map<String, dynamic>>> commands(String sessionId) async {
+    final r = await call(
+      'GET',
+      '$_prefix/link/commands',
+      query: '?sessionId=${Uri.encodeQueryComponent(sessionId)}',
+    );
+    final raw = r['commands'] ?? r['items'] ?? r['data'];
+    if (raw is List) return raw.whereType<Map<String, dynamic>>().toList();
+    return const <Map<String, dynamic>>[];
+  }
+
+  /// 电脑上可用的智能体预设。
+  Future<List<Map<String, dynamic>>> agentPresets() async {
+    final r = await call('GET', '$_prefix/link/agent-presets');
+    final raw = r['presets'] ?? r['items'] ?? r['data'];
+    if (raw is List) return raw.whereType<Map<String, dynamic>>().toList();
+    return const <Map<String, dynamic>>[];
+  }
+
   /// 会话流：服务端是 SSE（`text/event-stream`），不是 WebSocket。
   ///
   /// 每一帧要么是明文 JSON（服务端没开逐帧封装），要么是 `{"v":2,"n":…,"c":…}`
