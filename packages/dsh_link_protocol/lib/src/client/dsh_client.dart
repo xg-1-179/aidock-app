@@ -52,6 +52,7 @@ class DshClient {
     String deviceName = 'AIDock',
     String platform = 'android',
     String? pairingCode,
+    String? pairPath,
   }) async {
     final pairKey = await DshCrypto.pairKey(ticket, instanceId);
     final aad = 'pair|v2|$instanceId';
@@ -74,9 +75,14 @@ class DshClient {
     });
     final res = await transport.send(
       method: 'POST',
-      path: '$_prefix/pair',
+      path: pairPath ?? '$_prefix/pair',
       query: '',
-      headers: const {'Content-Type': 'application/json', 'X-Dsh-Proto': '2'},
+      headers: <String, String>{
+        'Content-Type': 'application/json',
+        'X-Dsh-Proto': '2',
+        // AIDock：宿主用这个头把「六位连接码」换成等价于二维码票据的派生素材。
+        if (pairingCode != null) 'X-Aidock-Code': pairingCode,
+      },
       body: body,
     );
     if (!res.ok) {

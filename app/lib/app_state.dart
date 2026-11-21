@@ -97,6 +97,7 @@ class AppState extends ChangeNotifier {
         deviceKey: deviceKey,
         keyId: keyId,
         pairingCode: code.trim(),
+        pairPath: '/api/mobile/v1/link/pair',
       );
       _client = result.client;
       paired = true;
