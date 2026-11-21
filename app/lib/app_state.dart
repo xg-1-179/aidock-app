@@ -7,6 +7,8 @@ import 'package:dsh_link_protocol/dsh_link_protocol.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'notify.dart';
+
 class ChatMessage {
   ChatMessage({
     required this.role,
@@ -185,6 +187,9 @@ class AppState extends ChangeNotifier {
   String? savedHost;
   String? savedPermissions;
   bool get hasSaved => machines.isNotEmpty;
+
+  /// App 是否在前台；后台时收到审批/提问才发系统通知。
+  bool appForeground = true;
 
   /// 连过的电脑（最近连的排最前）。
   final List<SavedMachine> machines = [];
@@ -1033,12 +1038,16 @@ class AppState extends ChangeNotifier {
         }
         final qRpc = '${inner['rpcId'] ?? payload['rpcId'] ?? ''}';
         if (qRpc.isNotEmpty && items.isNotEmpty) {
+          final isNew = !questions.any((e) => e.rpcId == qRpc);
           questions.removeWhere((e) => e.rpcId == qRpc);
           questions.add(QuestionCard(
             rpcId: qRpc,
             sessionId: '${inner['sessionId'] ?? openSessionId ?? ''}',
             questions: items,
           ));
+          if (isNew && !appForeground) {
+            unawaited(Notifier.show('电脑在等你回答', items.first.text));
+          }
         }
         break;
       case 'question/resolved':
@@ -1058,8 +1067,15 @@ class AppState extends ChangeNotifier {
           rememberable: inner['rememberable'] == true,
         );
         if (card.rpcId.isNotEmpty && card.approvalId.isNotEmpty) {
+          final isNew = !approvals.any((e) => e.approvalId == card.approvalId);
           approvals.removeWhere((e) => e.approvalId == card.approvalId);
           approvals.add(card);
+          if (isNew && !appForeground) {
+            unawaited(Notifier.show(
+              '需要你批准：${card.toolName.isEmpty ? '工具调用' : card.toolName}',
+              card.fact.isNotEmpty ? card.fact : card.reason,
+            ));
+          }
         }
         break;
       case 'approval/resolved':
@@ -1067,6 +1083,10 @@ class AppState extends ChangeNotifier {
         if (id.isNotEmpty) approvals.removeWhere((e) => e.approvalId == id);
         break;
       case 'turn/end':
+        if (!appForeground && streamingNow) {
+          unawaited(Notifier.show('这一轮跑完了', _lastAssistantText()));
+        }
+        break;
       case 'step/end':
         streamingNow = false;
         if (messages.isNotEmpty) messages.last.streaming = false;
@@ -1120,6 +1140,18 @@ class AppState extends ChangeNotifier {
       messages[entry.key].images = got;
       notifyListeners();
     }
+  }
+
+  /// 最近一条助手消息的前 80 字（通知里当正文用）。
+  String _lastAssistantText() {
+    for (var i = messages.length - 1; i >= 0; i--) {
+      final m = messages[i];
+      if (m.role == 'assistant' && m.text.trim().isNotEmpty) {
+        final t = m.text.trim().replaceAll(RegExp(r'\s+'), ' ');
+        return t.length <= 80 ? t : '${t.substring(0, 80)}…';
+      }
+    }
+    return '回到 AIDock 看看结果';
   }
 
   static String _textOfMessage(Map<String, dynamic> msg) {
