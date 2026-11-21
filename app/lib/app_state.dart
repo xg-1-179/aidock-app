@@ -807,6 +807,28 @@ class AppState extends ChangeNotifier {
   /// 也不至于把「用户连发两条一样的文本」当成重复吞掉。
   final Set<String> _seenIds = <String>{};
 
+  /// 回到前台时补一次连接检查。
+  ///
+  /// 手机锁屏或切后台后，系统会掐掉长连接，而 Dart 的定时器也跟着停——只靠心跳看门狗，
+  /// 用户解锁回来可能先盯着「正在自动重连…」等几十秒。这里不等计时器，直接判一次：
+  /// 流已经没了就立刻重挂，流还挂着但很久没帧也重挂。
+  void onResumed() {
+    final c = _client;
+    final sid = _streamSessionId ?? openSessionId;
+    if (c != null && sid != null) {
+      final idle = DateTime.now().difference(_lastFrameAt).inSeconds;
+      if (_sub == null || reconnecting || idle >= 30) {
+        _retryTimer?.cancel();
+        _retryTimer = null;
+        _retryCount = 0;
+        _sub?.cancel();
+        _sub = null;
+        _attachStream(c, sid);
+      }
+    }
+    if (_client != null) unawaited(refreshSessions());
+  }
+
   void _attachStream(DshClient c, String sessionId) {
     _streamClient = c;
     _streamSessionId = sessionId;
@@ -1285,6 +1307,14 @@ class AppState extends ChangeNotifier {
       messages.clear();
     }
     final body = text.trim();
+    // 宿主单条消息 ≤ 8MB 明文（SEND_MAX_BODY = ceil(8MB*4/3)），超了会被整条拒掉，
+    // 与其让用户等一轮失败，不如当场说清楚该压到多大。
+    if (bytes.length > 7 * 1024 * 1024) {
+      error = '这张图 ${(bytes.length / 1048576).toStringAsFixed(1)}MB，太大了：'
+          '单张请压到 7MB 以内再发';
+      notifyListeners();
+      return;
+    }
     final encoded = base64Encode(bytes);
     final content = <Map<String, dynamic>>[
       if (body.isNotEmpty) {'type': 'text', 'text': body},

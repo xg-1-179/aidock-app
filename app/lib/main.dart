@@ -33,6 +33,9 @@ class _AidockAppState extends State<AidockApp> with WidgetsBindingObserver {
     super.didChangeAppLifecycleState(phase);
     // 只有退到后台才发通知，前台看着屏幕时不打扰。
     state.appForeground = phase == AppLifecycleState.resumed;
+    // 回到前台：手机在锁屏/切后台时系统会掐断长连接，而计时器也跟着停，靠心跳看门狗
+    // 兜底要等几十秒。这里直接补一次「要不要立刻重连」，让界面几百毫秒内恢复。
+    if (phase == AppLifecycleState.resumed) state.onResumed();
   }
 
   @override

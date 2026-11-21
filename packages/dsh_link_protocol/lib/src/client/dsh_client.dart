@@ -460,7 +460,7 @@ class DshClient {
   /// `v2|down|sse|<path>|<ts>|<nonce>|<seq>`，序号从 1 起、宿主自己数。
   Stream<Map<String, dynamic>> stream(String sessionId) async* {
     const path = '$_prefix/link/session/stream';
-    final query = '?sessionId=$sessionId';
+    final query = '?sessionId=${Uri.encodeQueryComponent(sessionId)}';
     final env = await DshEnvelope.build(
       keys: keys,
       keyId: keyId,
@@ -481,19 +481,33 @@ class DshClient {
     }
     final buffer = StringBuffer();
     var seq = 0;
+    // 解不开的帧不能把整条流带死：一帧坏了就跳过它并计数，连续坏到一定数量才判这条流
+    // 不可用（那时多半是密钥/序号对不上，重连也救不回来，交给上层报错）。
+    var broken = 0;
     try {
       await for (final line in es.lines) {
         if (line.isEmpty) {
           final raw = buffer.toString();
           buffer.clear();
           if (raw.isEmpty) continue;
-          final frame = await _openFrame(
-            raw,
-            path: path,
-            timestamp: env.timestamp,
-            nonce: env.nonce,
-            seq: ++seq,
-          );
+          final thisSeq = ++seq;
+          Map<String, dynamic>? frame;
+          try {
+            frame = await _openFrame(
+              raw,
+              path: path,
+              timestamp: env.timestamp,
+              nonce: env.nonce,
+              seq: thisSeq,
+            );
+          } catch (error) {
+            broken += 1;
+            if (broken >= 5) {
+              throw DshClientException('会话流连续 $broken 帧解不开：$error');
+            }
+            continue;
+          }
+          broken = 0;
           if (frame != null) yield frame;
           continue;
         }
