@@ -269,7 +269,7 @@ class DshClient {
   Future<Map<String, dynamic>?> _openFrame(
     String raw, {
     required String path,
-    required String timestamp,
+    required int timestamp,
     required String nonce,
     required int seq,
   }) async {
