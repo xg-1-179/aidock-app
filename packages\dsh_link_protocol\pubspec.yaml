@@ -1,0 +1,13 @@
+name: dsh_link_protocol
+description: DSH Link protocol v2 (E2EE envelope + pairing handshake) in pure Dart.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  cryptography: ^2.7.0
+
+dev_dependencies:
+  test: ^1.25.0
