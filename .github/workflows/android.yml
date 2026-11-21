@@ -1,0 +1,50 @@
+name: android
+
+on:
+  push:
+    paths:
+      - 'app/**'
+      - 'packages/dsh_link_protocol/**'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.24.5'
+          cache: true
+
+      - name: Scaffold android platform
+        run: |
+          cd app
+          flutter create --platforms=android --project-name aidock --org com.aidock .
+          flutter pub get
+
+      - name: Analyze
+        run: cd app && flutter analyze --no-fatal-infos || true
+
+      - name: Build release APK
+        run: cd app && flutter build apk --release
+
+      - name: Collect artifact
+        run: |
+          mkdir -p out
+          cp app/build/app/outputs/flutter-apk/app-release.apk out/AIDock-${GITHUB_SHA::7}.apk
+          ls -lh out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aidock-apk
+          path: out/*.apk
+          if-no-files-found: error

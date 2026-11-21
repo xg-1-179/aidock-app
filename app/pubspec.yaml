@@ -1,0 +1,21 @@
+name: aidock
+description: AIDock 手机客户端（DeepSeek Harness 远程伴侣）
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  dsh_link_protocol:
+    path: ../packages/dsh_link_protocol
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
