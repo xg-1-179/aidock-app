@@ -33,7 +33,11 @@ class MockHost {
     final body = await utf8.decoder.bind(req).join();
     final path = req.uri.path;
     seenPaths.add('${req.method} $path' + (req.uri.query.isEmpty ? '' : '?${req.uri.query}'));
-    seenHeaders.add({for (final h in req.headers.keys) h: '${req.headers.value(h)}'});
+    final hs = <String, String>{};
+    req.headers.forEach((name, values) {
+      hs[name.toLowerCase()] = values.join(',');
+    });
+    seenHeaders.add(hs);
 
     if (path == '/api/mobile/v1/pair') {
       final pairKey = await DshCrypto.pairKey(_ticket, _instanceId);
