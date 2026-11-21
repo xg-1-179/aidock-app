@@ -384,6 +384,19 @@ class DshClient {
   ///
   /// `answers` 每题恰好一条：`{id, selected:[label...], custom?}`。宿主按题数严格校验，
   /// 少一条或多一条都回 400（见 `lib/mobile/questions.js` 的 `normalizeAnswers`）。
+  /// 这条会话此刻还挂着的卡（审批 / 提问）。
+  ///
+  /// 审批与提问帧都不带 seq，重连不会回放；手机切后台回来时会看不见卡，而宿主仍在等答复。
+  /// 挂上流之后、以及回到前台时各问一次，就能把卡补回界面。
+  Future<Map<String, dynamic>> pendingCards(String sessionId) async {
+    final result = await call(
+      'GET',
+      '$_prefix/link/pending',
+      query: '?sessionId=${Uri.encodeQueryComponent(sessionId)}',
+    );
+    return result;
+  }
+
   Future<Map<String, dynamic>> respondQuestion({
     required String rpcId,
     required String sessionId,

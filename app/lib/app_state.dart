@@ -807,6 +807,23 @@ class AppState extends ChangeNotifier {
   /// 也不至于把「用户连发两条一样的文本」当成重复吞掉。
   final Set<String> _seenIds = <String>{};
 
+  /// 把宿主此刻挂着的卡补进界面（审批 / 提问帧不带 seq，重连不会回放）。
+  Future<void> _syncPending(DshClient c, String sessionId) async {
+    try {
+      final payload = await c.pendingCards(sessionId);
+      final approval = payload['approval'];
+      if (approval is Map<String, dynamic> && approval['type'] != null) {
+        _onFrame(approval);
+      }
+      final question = payload['question'];
+      if (question is Map<String, dynamic> && question['type'] != null) {
+        _onFrame(question);
+      }
+    } catch (_) {
+      // 补卡失败不致命：流本身还在，真卡再推送一次也能补上。
+    }
+  }
+
   /// 回到前台时补一次连接检查。
   ///
   /// 手机锁屏或切后台后，系统会掐掉长连接，而 Dart 的定时器也跟着停——只靠心跳看门狗，
@@ -824,6 +841,8 @@ class AppState extends ChangeNotifier {
         _sub?.cancel();
         _sub = null;
         _attachStream(c, sid);
+      } else {
+        unawaited(_syncPending(c, sid));
       }
     }
     if (_client != null) unawaited(refreshSessions());
@@ -865,6 +884,7 @@ class AppState extends ChangeNotifier {
       _sub = null;
       _scheduleReconnect(c, sessionId, '心跳超时');
     });
+    unawaited(_syncPending(c, sessionId));
   }
 
   /// 401/403 不是「网断了」，重试一万次也不会好：直接把话说明白，让用户去重连。
