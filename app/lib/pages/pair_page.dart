@@ -129,6 +129,32 @@ class _PairPageState extends State<PairPage> {
                   ),
                 ),
               ],
+              if (s.probeLog.isNotEmpty && !s.paired) ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AidockColors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AidockColors.line),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('连接诊断',
+                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      for (final line in s.probeLog)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Text(line,
+                              style: const TextStyle(
+                                  fontSize: 11.5, color: AidockColors.textDim, height: 1.4)),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
@@ -165,7 +191,8 @@ class _PairPageState extends State<PairPage> {
                         style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                     SizedBox(height: 8),
                     Text('· 确认电脑上的 AIDock 正在运行，插件页显示「直连已就绪」\n'
-                        '· 连接码 2 分钟内有效，过期就点电脑上的「刷新连接码」\n'
+                        '· 连接码 10 分钟内有效，过期就刷新电脑上的连接码页面\n'
+                        '· 地址可以填多个（用空格或逗号分开），会并行探测取最快的那条\n'
                         '· 公网直连需要在云服务器安全组放行该端口',
                         style: TextStyle(fontSize: 12.5, color: AidockColors.textDim, height: 1.6)),
                   ],

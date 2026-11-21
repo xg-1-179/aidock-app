@@ -78,6 +78,9 @@ class AppState extends ChangeNotifier {
 
   String connectionKind = '';
 
+  /// 上一次多路探测的结果（连接诊断用）：每条是 `地址 → 成功/失败原因`。
+  final List<String> probeLog = [];
+
   final List<SessionItem> sessions = [];
   final List<ChatMessage> messages = [];
   final List<ApprovalCard> approvals = [];
@@ -98,6 +101,44 @@ class AppState extends ChangeNotifier {
     return Uri(scheme: uri.scheme, host: uri.host, port: uri.port);
   }
 
+  /// 把用户填的一串地址拆成候选通道：逗号/空格/换行分隔，私网段算 lan、其余算 wan。
+  ///
+  /// 设计原则见 docs/CONNECTIVITY.md：没有任何一条通道是"必须存在"的，
+  /// 全都摆在同一层并行探测，谁先答话就用谁。
+  static List<Candidate> parseCandidates(String raw) {
+    final parts = raw
+        .split(RegExp(r'[,，\s]+'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty);
+    final out = <Candidate>[];
+    final seen = <String>{};
+    for (final part in parts) {
+      final base = normalizeHost(part);
+      final key = base.toString();
+      if (!seen.add(key)) continue;
+      out.add(Candidate(
+        id: '${base.host}:${base.port}',
+        baseUrl: base,
+        kind: _kindOf(base.host),
+      ));
+    }
+    return out;
+  }
+
+  static CandidateKind _kindOf(String host) {
+    final ip = RegExp(r'^(\d{1,3})\.(\d{1,3})\.');
+    final m = ip.firstMatch(host);
+    if (m != null) {
+      final a = int.parse(m.group(1)!);
+      final b = int.parse(m.group(2)!);
+      if (a == 10 || (a == 192 && b == 168) || (a == 172 && b >= 16 && b <= 31)) {
+        return CandidateKind.lan;
+      }
+    }
+    if (host.endsWith('.local') || host == 'localhost') return CandidateKind.lan;
+    return CandidateKind.wan;
+  }
+
   static Uint8List _randomBytes(int n) {
     final r = Random.secure();
     return Uint8List.fromList(List<int>.generate(n, (_) => r.nextInt(256)));
@@ -109,9 +150,43 @@ class AppState extends ChangeNotifier {
   Future<void> connect(String rawHost, String code) async {
     busy = true;
     error = null;
+    probeLog.clear();
     notifyListeners();
     try {
-      final base = normalizeHost(rawHost);
+      final candidates = parseCandidates(rawHost);
+      if (candidates.isEmpty) throw const FormatException('请输入电脑地址');
+      // 多路并行探测：每条候选 3 秒超时，先答话的先用，其余继续收集供诊断。
+      final probe = ConnectionProbe(
+        timeout: const Duration(seconds: 3),
+        probe: (candidate, timeout) async {
+          final t = IoDshTransport(candidate.baseUrl, timeout: timeout);
+          try {
+            final r = await t.send(
+              method: 'GET',
+              path: '/api/mobile/v1/link/info',
+              query: '',
+              headers: const {},
+              body: '',
+            );
+            if (!r.ok) throw StateError('HTTP ${r.status}');
+          } finally {
+            t.close();
+          }
+        },
+      );
+      final report = await probe.race(candidates);
+      for (final ok in report.successes) {
+        probeLog.add('${ok.candidate.id} 可用 ${ok.latency.inMilliseconds}ms');
+      }
+      for (final bad in report.failures) {
+        probeLog.add('${bad.candidate.id} 失败：${bad.error}');
+      }
+      final winner = report.winner;
+      if (winner == null) {
+        throw DshClientException('这些地址都连不上（${candidates.length} 条，均超时）');
+      }
+      final base = winner.candidate.baseUrl;
+      connectionKind = winner.candidate.kind.name;
       hostLabel = '${base.host}:${base.port}';
       _transport?.close();
       final transport = IoDshTransport(base);
