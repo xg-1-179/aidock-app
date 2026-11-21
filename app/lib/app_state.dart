@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:dsh_link_protocol/dsh_link_protocol.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ChatMessage {
   ChatMessage({required this.role, required this.text, this.streaming = false});
@@ -77,6 +78,19 @@ class AppState extends ChangeNotifier {
   bool paired = false;
 
   String connectionKind = '';
+
+  // ---- 免码重连：上次配对的东西存在手机本地 ----
+  static const String _kHost = 'aidock.host';
+  static const String _kDeviceKey = 'aidock.deviceKey';
+  static const String _kKeyId = 'aidock.keyId';
+  static const String _kInstance = 'aidock.instanceId';
+  static const String _kToken = 'aidock.token';
+  static const String _kCredential = 'aidock.deviceCredential';
+  static const String _kPerms = 'aidock.permissions';
+
+  String? savedHost;
+  String? savedPermissions;
+  bool get hasSaved => (savedHost ?? '').isNotEmpty;
 
   /// 上一次多路探测的结果（连接诊断用）：每条是 `地址 → 成功/失败原因`。
   final List<String> probeLog = [];
@@ -152,6 +166,110 @@ class AppState extends ChangeNotifier {
 
   static String _hex(List<int> b) =>
       b.map((e) => e.toRadixString(16).padLeft(2, '0')).join();
+
+  /// 启动时读一次：有记录就在配对页顶上一张「上次连接的电脑」。
+  Future<void> loadSaved() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      savedHost = p.getString(_kHost);
+      savedPermissions = p.getString(_kPerms);
+      notifyListeners();
+    } catch (_) {
+      // 存储不可用不该挡住输入六位码这条路。
+    }
+  }
+
+  Future<void> _rememberDevice({
+    required String host,
+    required List<int> deviceKey,
+    required String keyId,
+    required String instanceId,
+    required Map<String, dynamic> grant,
+  }) async {
+    final token = grant['token'] is String ? grant['token'] as String : '';
+    final credential =
+        grant['deviceCredential'] is String ? grant['deviceCredential'] as String : '';
+    final perms = grant['permissions'] is List ? (grant['permissions'] as List).join(',') : '';
+    savedHost = host;
+    savedPermissions = perms;
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setString(_kHost, host);
+      await p.setString(_kDeviceKey, base64Url.encode(deviceKey).replaceAll('=', ''));
+      await p.setString(_kKeyId, keyId);
+      await p.setString(_kInstance, instanceId);
+      await p.setString(_kToken, token);
+      await p.setString(_kCredential, credential);
+      await p.setString(_kPerms, perms);
+    } catch (_) {}
+  }
+
+  Future<void> forgetSaved() async {
+    savedHost = null;
+    savedPermissions = null;
+    try {
+      final p = await SharedPreferences.getInstance();
+      for (final k in [_kHost, _kDeviceKey, _kKeyId, _kInstance, _kToken, _kCredential, _kPerms]) {
+        await p.remove(k);
+      }
+    } catch (_) {}
+    notifyListeners();
+  }
+
+  /// 用手机里存的凭据直接回去，不扫码不输六位码。
+  /// 失败点很明确：凭据过期（401）→ 让用户重新拿码；连不上 → 报连接错误。
+  Future<void> reconnectSaved() async {
+    final host = savedHost;
+    if (host == null || host.isEmpty) return;
+    busy = true;
+    error = null;
+    notifyListeners();
+    try {
+      final p = await SharedPreferences.getInstance();
+      final keyB64 = p.getString(_kDeviceKey) ?? '';
+      final keyId = p.getString(_kKeyId) ?? '';
+      final instance = p.getString(_kInstance) ?? '';
+      final token = p.getString(_kToken) ?? '';
+      final credential = p.getString(_kCredential) ?? '';
+      if (keyB64.isEmpty || keyId.isEmpty) {
+        throw const FormatException('本地凭据不完整，请用六位码重连一次');
+      }
+      final base = Uri.parse(host);
+      final transport = IoDshTransport(base);
+      _transport?.close();
+      _transport = transport;
+      final keys = await DshCrypto.sessionKeys(
+        Uint8List.fromList(base64Url.decode(base64Url.normalize(keyB64))),
+      );
+      _client = DshClient(
+        baseUrl: base,
+        transport: transport,
+        keys: keys,
+        keyId: keyId,
+        instanceId: instance,
+        authToken: token,
+        deviceCredential: credential,
+      );
+      instanceId = instance;
+      hostLabel = '${base.host}:${base.port}';
+      paired = true;
+      await refreshSessions();
+      if (error != null) {
+        throw StateError(error!);
+      }
+    } on DshClientException catch (e) {
+      paired = false;
+      error = e.status == 401
+          ? '上次的登录凭据过期了，重新用六位码连一次'
+          : '${e.message}（HTTP ${e.status}）';
+    } catch (e) {
+      paired = false;
+      error = '连不上上次那台电脑：$e';
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+  }
 
   Future<void> connect(String rawHost, String code) async {
     busy = true;
@@ -245,6 +363,14 @@ class AppState extends ChangeNotifier {
       _client = result.client;
       paired = true;
       connectionKind = '${meta['transport'] ?? 'direct'}';
+      // 存下来：下次开 App 不用再问一遍地址和六位码。
+      await _rememberDevice(
+        host: base.toString(),
+        deviceKey: deviceKey,
+        keyId: keyId,
+        instanceId: instanceId!,
+        grant: result.grant,
+      );
       await refreshSessions();
     } on DshClientException catch (e) {
       error = e.status == 401 ? '连接码不对，或已经过期' : '${e.message}（HTTP ${e.status}）';

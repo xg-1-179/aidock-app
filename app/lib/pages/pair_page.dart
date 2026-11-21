@@ -25,6 +25,59 @@ class _PairPageState extends State<PairPage> {
     super.dispose();
   }
 
+  /// 上次连过的电脑：省掉重新输地址和六位码（凭据过期会提示重新拿码）。
+  Widget _savedCard(AppState s) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      decoration: BoxDecoration(
+        color: AidockColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AidockColors.accent.withOpacity(0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.history_rounded, size: 18, color: AidockColors.accent),
+              SizedBox(width: 8),
+              Text('上次连接的电脑',
+                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          SelectableText(s.savedHost ?? '',
+              style: const TextStyle(
+                  fontSize: 12, color: AidockColors.textDim, fontFamily: 'monospace')),
+          if ((s.savedPermissions ?? '').isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text('权限：${s.savedPermissions}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 11, color: AidockColors.textDim, height: 1.4)),
+          ],
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: s.busy ? null : () => s.reconnectSaved(),
+                  icon: const Icon(Icons.bolt_rounded, size: 18),
+                  label: const Text('直接连接'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: s.busy ? null : () => s.forgetSaved(),
+                child: const Text('忘掉'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   void _submit() {
     if (_code.text.trim().length < 4) {
       _codeFocus.requestFocus();
@@ -68,6 +121,10 @@ class _PairPageState extends State<PairPage> {
                 ],
               ),
               const SizedBox(height: 34),
+              if (s.hasSaved) ...[
+                _savedCard(s),
+                const SizedBox(height: 20),
+              ],
               const Text('连接这台电脑',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               const SizedBox(height: 6),

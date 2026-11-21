@@ -16,11 +16,15 @@ class DshClientException implements Exception {
   String toString() => 'DshClientException($message${status == null ? '' : ', HTTP $status'})';
 }
 
-/// 已不在信任的通道：传给 [DshTransport] 之外的调用方，用于记失败。
+/// 已可信的通道：配对成功后拿到的东西，调用方拿它换会话列表、发消息。
 class DshPairResult {
-  DshPairResult({required this.client, required this.instanceId});
+  DshPairResult({required this.client, required this.instanceId, this.grant = const {}});
   final DshClient client;
   final String instanceId;
+
+  /// 宿主在配对回包里封回来的授权信息（`token`、`deviceCredential`、`permissions`、
+  /// `credentialExpiresAt`…）。App 要拿它做「免码重连」，所以原样留着。
+  final Map<String, dynamic> grant;
 }
 
 class DshClient {
@@ -30,6 +34,8 @@ class DshClient {
     required this.keys,
     required this.keyId,
     this.instanceId,
+    this.authToken,
+    this.deviceCredential,
   });
 
   final Uri baseUrl;
@@ -38,7 +44,26 @@ class DshClient {
   final String keyId;
   final String? instanceId;
 
+  /// 配对回包里那枚访问令牌。**每条业务请求都要带 `Authorization: Bearer <token>`**：
+  /// 只带签名不带令牌会被宿主当「没有移动 token」直接 401，症状是能配对、什么也打不开。
+  final String? authToken;
+
+  /// 宿主另外发的设备凭据（部分版本用 `X-Dsh-Device-Credential` 认设备）。
+  final String? deviceCredential;
+
   static const _prefix = '/api/mobile/v1';
+
+  /// 把配对拿到的令牌贴到请求头上；没有令牌时原样返回（配对前的请求）。
+  Map<String, String> _withAuth(Map<String, String> headers) {
+    final out = Map<String, String>.from(headers);
+    final token = authToken;
+    if (token != null && token.isNotEmpty) out['Authorization'] = 'Bearer $token';
+    final credential = deviceCredential;
+    if (credential != null && credential.isNotEmpty) {
+      out['X-Dsh-Device-Credential'] = credential;
+    }
+    return out;
+  }
 
   /// 配对：用配对票 [ticket] 与 [instanceId] 派生 `pairKey`，把设备公钥材料送上去。
   ///
@@ -91,6 +116,19 @@ class DshClient {
     if (json['ok'] != true) {
       throw DshClientException('pair rejected: ${json['error'] ?? res.body}');
     }
+    // 授权信息是**封在 sealed 里**回来的：token、deviceCredential、permissions 都在里面，
+    // 不解包就只能带着签名去撞每条接口的 401。
+    var grant = const <String, dynamic>{};
+    final sealedB64 = json['sealed'];
+    if (sealedB64 is String && sealedB64.isNotEmpty) {
+      final clear = await DshCrypto.open(
+        key: pairKey,
+        sealed: base64Url.decode(base64Url.normalize(sealedB64)),
+        aad: aad,
+      );
+      final decoded = jsonDecode(utf8.decode(clear));
+      if (decoded is Map<String, dynamic>) grant = decoded;
+    }
     final keys = await DshCrypto.sessionKeys(deviceKey);
     return DshPairResult(
       client: DshClient(
@@ -99,8 +137,12 @@ class DshClient {
         keys: keys,
         keyId: keyId,
         instanceId: instanceId,
+        authToken: grant['token'] is String ? grant['token'] as String : null,
+        deviceCredential:
+            grant['deviceCredential'] is String ? grant['deviceCredential'] as String : null,
       ),
       instanceId: instanceId,
+      grant: grant,
     );
   }
 
@@ -123,7 +165,7 @@ class DshClient {
       method: method,
       path: path,
       query: query,
-      headers: env.headers,
+      headers: _withAuth(env.headers),
       body: env.body,
     );
     if (!res.ok) {
@@ -311,7 +353,7 @@ class DshClient {
       method: 'GET',
       path: path,
       query: query,
-      headers: env.headers,
+      headers: _withAuth(env.headers),
     );
     if (!es.ok) {
       await es.close();
