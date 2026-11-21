@@ -550,6 +550,7 @@ class AppState extends ChangeNotifier {
     openSessionId = item.id;
     messages.clear();
     approvals.clear();
+    _seenIds.clear();
     notifyListeners();
     final c = _client;
     if (c == null) return;
@@ -560,6 +561,8 @@ class AppState extends ChangeNotifier {
         final role = '${row['role'] ?? row['author'] ?? ''}';
         final text = _textOfMessage(row);
         if (text.isEmpty) continue;
+        final id = '${row['id'] ?? ''}';
+        if (id.isNotEmpty) _seenIds.add(id);
         final mine = role == 'user' || role == 'human';
         messages.add(ChatMessage(role: mine ? 'user' : 'assistant', text: text));
       }
@@ -584,11 +587,17 @@ class AppState extends ChangeNotifier {
   /// 当前挂着流的客户端与会话，供 `session/resync-required` 触发补历史。
   DshClient? _streamClient;
   String? _streamSessionId;
+  /// 已经显示过的主机消息 id：补历史时按 id 去重，避免同一段被插两遍，
+  /// 也不至于把「用户连发两条一样的文本」当成重复吞掉。
+  final Set<String> _seenIds = <String>{};
 
   void _attachStream(DshClient c, String sessionId) {
     _streamClient = c;
     _streamSessionId = sessionId;
     _lastFrameAt = DateTime.now();
+    // 挂上就先把条收掉：真断了 onError/onDone 会再把它立起来。等心跳帧再收
+    // 会让「正在自动重连…」在安静会话里多挂 15 秒。
+    if (reconnecting) reconnecting = false;
     _sub = c.stream(sessionId).listen((frame) {
       _lastFrameAt = DateTime.now();
       if (reconnecting) {
@@ -672,26 +681,29 @@ class AppState extends ChangeNotifier {
   }
 
   /// 重连前补历史：只把断线期间新出现的消息接到尾巴上，不重刷整段。
+  ///
+  /// 去重按主机给的 `id`：老宿主不带 id 时只拿「最后两条」对齐，绝不在全表里找——
+  /// 否则用户连发两条一样的文本，第二条会被当成重复吞掉。
   Future<void> _catchUp(DshClient c, String sessionId) async {
     final rows = await c.messages(sessionId, limit: 20);
-    final incoming = <ChatMessage>[];
+    var added = 0;
     for (final row in rows) {
-      final role = '${row['role'] ?? row['author'] ?? ''}';
       final text = _textOfMessage(row);
       if (text.isEmpty) continue;
-      incoming.add(ChatMessage(role: role == 'user' || role == 'human' ? 'user' : 'assistant', text: text));
+      final role = '${row['role'] ?? row['author'] ?? ''}';
+      final mine = role == 'user' || role == 'human';
+      final id = '${row['id'] ?? ''}';
+      if (id.isNotEmpty) {
+        if (!_seenIds.add(id)) continue;
+      } else {
+        final tail = messages.length >= 2 ? messages.sublist(messages.length - 2) : messages;
+        final dup = tail.any((x) => x.text == text && x.role == (mine ? 'user' : 'assistant'));
+        if (dup) continue;
+      }
+      messages.add(ChatMessage(role: mine ? 'user' : 'assistant', text: text));
+      added++;
     }
-    if (incoming.isEmpty) return;
-    // 尾巴对齐：把已显示的最后一两条与新历史的最前一条比，避免重复插入同一段。
-    final tail = messages.isEmpty ? null : messages.last.text;
-    for (final m in incoming) {
-      final dup = tail != null && (m.text == tail ||
-          (messages.length >= 1 && messages[messages.length - 1].text == m.text));
-      if (dup) continue;
-      if (messages.any((x) => x.role == m.role && x.text == m.text)) continue;
-      messages.add(m);
-    }
-    notifyListeners();
+    if (added > 0) notifyListeners();
   }
 
   void closeSession() {
@@ -706,6 +718,7 @@ class AppState extends ChangeNotifier {
     openSessionId = null;
     messages.clear();
     approvals.clear();
+    _seenIds.clear();
     streamingNow = false;
     notifyListeners();
   }
@@ -736,7 +749,13 @@ class AppState extends ChangeNotifier {
     switch (type) {
       case 'user/message':
         final text = _textOfMessage(payload);
-        if (text.isNotEmpty) messages.add(ChatMessage(role: 'user', text: text));
+        if (text.isNotEmpty) {
+          // 自己刚发出的那条已经在本地乐观显示了，宿主随后必然回推同一条：
+          // 再插一次屏幕上就会出现两条「一模一样」的用户消息。
+          final last = messages.isEmpty ? null : messages.last;
+          final dup = last != null && last.role == 'user' && last.text == text;
+          if (!dup) messages.add(ChatMessage(role: 'user', text: text));
+        }
         break;
       case 'assistant/chunk':
         final chunk = payload['chunk'];
@@ -755,12 +774,17 @@ class AppState extends ChangeNotifier {
         final msg = payload['message'];
         final text = _textOfMessage(msg is Map<String, dynamic> ? msg : payload);
         streamingNow = false;
-        if (messages.isNotEmpty && messages.last.streaming) {
-          messages.last.streaming = false;
-          if (text.isNotEmpty) messages.last.text = text;
-        } else if (text.isNotEmpty) {
-          messages.add(ChatMessage(role: 'assistant', text: text));
+        if (messages.isNotEmpty && messages.last.role == 'assistant') {
+          final tail = messages.last;
+          // 三种收尾都归到同一个气泡上：还在流式中、已经流完但文本相同、
+          // 或者流式只拿到前半截（这一帧才是全量正文）。
+          if (tail.streaming || tail.text == text || (tail.text.isNotEmpty && text.startsWith(tail.text))) {
+            tail.streaming = false;
+            if (text.isNotEmpty) tail.text = text;
+            break;
+          }
         }
+        if (text.isNotEmpty) messages.add(ChatMessage(role: 'assistant', text: text));
         break;
       case 'approval/requested':
         final card = ApprovalCard(
@@ -850,6 +874,12 @@ class AppState extends ChangeNotifier {
     final c = _client;
     final sid = openSessionId;
     if (c == null || sid == null || text.trim().isEmpty) return;
+    // 空会话那句占位提示在第一条真消息到达时就该让位。
+    if (messages.length == 1 &&
+        messages.first.role == 'system' &&
+        messages.first.text == '这个会话还没有消息') {
+      messages.clear();
+    }
     messages.add(ChatMessage(role: 'user', text: text.trim()));
     streamingNow = true;
     notifyListeners();
