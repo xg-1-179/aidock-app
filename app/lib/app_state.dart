@@ -14,11 +14,24 @@ class ChatMessage {
 }
 
 class SessionItem {
-  SessionItem({required this.id, required this.title, this.subtitle = '', this.updatedAt = 0});
+  SessionItem({
+    required this.id,
+    required this.title,
+    this.subtitle = '',
+    this.updatedAt = 0,
+    this.running = false,
+    this.pending = false,
+    this.failed = false,
+    this.pinned = false,
+  });
   final String id;
   String title;
   String subtitle;
   int updatedAt;
+  bool running;
+  bool pending;
+  bool failed;
+  bool pinned;
 }
 
 class ApprovalCard {
@@ -149,6 +162,32 @@ class AppState extends ChangeNotifier {
     }
   }
 
+
+  static int _intOf(Object? v) => v is int ? v : (v is num ? v.toInt() : 0);
+
+  /// 列表行第二行：优先用宿主给的最后一条消息预览（`lastMessage.text`），
+  /// 其次 lastTurn 的失败原因，最后退回 cwd。
+  static String _previewOf(Map<String, dynamic> e) {
+    final last = e['lastMessage'];
+    if (last is Map) {
+      final text = '${last['text'] ?? ''}'.trim();
+      if (text.isNotEmpty) {
+        return text.replaceAll('\n', ' ');
+      }
+    }
+    final turn = e['lastTurn'];
+    final err = e['lastTurnError'];
+    if (err != null && err != false) {
+      return '上一轮失败：$err';
+    }
+    if (turn is Map && turn['at'] != null) {
+      return '最近一轮已结束';
+    }
+    final cwd = '${e['cwd'] ?? ''}'.trim();
+    if (cwd.isNotEmpty) return cwd;
+    return '';
+  }
+
   Future<void> refreshSessions() async {
     final c = _client;
     if (c == null) return;
@@ -159,12 +198,18 @@ class AppState extends ChangeNotifier {
         ..addAll(rows.map((e) => SessionItem(
               id: '${e['id'] ?? e['sessionId'] ?? e['session_id'] ?? ''}',
               title: '${e['title'] ?? e['name'] ?? '未命名会话'}',
-              subtitle: '${e['summary'] ?? e['lastMessage'] ?? e['workspace'] ?? ''}',
-              updatedAt: (e['updatedAt'] ?? e['ts'] ?? 0) is int
-                  ? (e['updatedAt'] ?? e['ts'] ?? 0) as int
-                  : 0,
+              subtitle: _previewOf(e),
+              updatedAt: _intOf(e['updatedAt'] ?? e['ts']),
+              running: e['running'] == true,
+              pending: e['pendingInteraction'] != null && e['pendingInteraction'] != false,
+              failed: e['lastTurnError'] != null && e['lastTurnError'] != false,
+              pinned: e['pinned'] == true,
             )).where((e) => e.id.isNotEmpty));
       error = null;
+    } on DshClientException catch (e) {
+      error = e.status == 500 && e.body.contains('apiProxy')
+          ? '电脑端插件还没加载完（缺少宿主接口），需要重启一次 DSH 再连'
+          : '读取会话失败：${e.message}（HTTP ${e.status}）';
     } catch (e) {
       error = '读取会话失败：$e';
     }

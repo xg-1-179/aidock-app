@@ -92,10 +92,22 @@ class SessionsPage extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(s.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600)),
+                            Row(
+                              children: [
+                                _dot(s),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(s.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          fontSize: 14.5, fontWeight: FontWeight.w600)),
+                                ),
+                                if (s.pinned)
+                                  const Icon(Icons.push_pin_rounded,
+                                      size: 14, color: AidockColors.textDim),
+                              ],
+                            ),
                             if (s.subtitle.isNotEmpty) ...[
                               const SizedBox(height: 6),
                               Text(s.subtitle,
@@ -111,6 +123,30 @@ class SessionsPage extends StatelessWidget {
                   );
                 },
               ),
+      ),
+    );
+  }
+
+  Widget _dot(SessionItem s) {
+    Color color;
+    if (s.running) {
+      color = AidockColors.accent;
+    } else if (s.pending) {
+      color = AidockColors.warn;
+    } else if (s.failed) {
+      color = AidockColors.danger;
+    } else {
+      color = AidockColors.textDim.withOpacity(0.45);
+    }
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        boxShadow: s.running
+            ? [BoxShadow(color: color.withOpacity(0.55), blurRadius: 6, spreadRadius: 1)]
+            : null,
       ),
     );
   }
