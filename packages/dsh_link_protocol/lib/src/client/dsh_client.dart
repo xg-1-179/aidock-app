@@ -61,7 +61,8 @@ class DshClient {
     };
     final sealed = await DshCrypto.seal(
       key: pairKey,
-      clear: utf8.encode(jsonEncode(clear)),
+      nonce: DshCrypto.randomNonce(),
+      plaintext: utf8.encode(jsonEncode(clear)),
       aad: aad,
     );
     final body = jsonEncode({'instanceId': instanceId, 'sealed': _b64u(sealed)});

@@ -64,8 +64,9 @@ class MockHost {
       final ws = await WebSocketTransformer.upgrade(req);
       final sealed = await DshCrypto.seal(
         key: _keys.down,
-        clear: utf8.encode(jsonEncode({'kind': 'assistant.delta', 'text': '你好'})),
-        aad: 'v2|stream:${req.uri.queryParameters['sessionId']}',
+        nonce: DshCrypto.randomNonce(),
+      plaintext: utf8.encode(jsonEncode({'kind': 'assistant.delta', 'text': '你好'})),
+        aad: 'v2|stream|${req.uri.queryParameters['sessionId']}',
       );
       ws.add(jsonEncode({'v': 2, 'c': base64.encode(sealed)}));
       await ws.close();
@@ -105,7 +106,8 @@ class MockHost {
     final downAad = 'v2|down|${req.method}|$path|$ts|$nonce';
     final sealed = await DshCrypto.seal(
       key: _keys.down,
-      clear: utf8.encode(jsonEncode(out)),
+      nonce: DshCrypto.randomNonce(),
+      plaintext: utf8.encode(jsonEncode(out)),
       aad: downAad,
     );
     _json(req, {'v': 2, 'c': base64.encode(sealed)});

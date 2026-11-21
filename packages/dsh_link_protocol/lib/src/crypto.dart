@@ -1,9 +1,10 @@
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 
-import 'sha256.dart';
+import 'sha256.dart' as dshsha;
 
 /// 协议 v2 的全部密码学原语。字节级规则见 docs/PROTOCOL-NOTES.md。
 class DshCrypto {
@@ -92,6 +93,27 @@ class DshCrypto {
 
   static String _b64u(List<int> bytes) =>
       base64Url.encode(bytes).replaceAll('=', '');
+
+  /// 生成 12 字节随机 nonce；[seal] 会把它拼在密文最前面。
+  static Uint8List randomNonce() {
+    final rnd = Random.secure();
+    return Uint8List.fromList(List<int>.generate(12, (_) => rnd.nextInt(256)));
+  }
+
+  /// 与 [open] 同义，语义上用于"配对阶段的公钥解密"，避免调用方误用会话密钥。
+  static Future<Uint8List> openPublic({
+    required List<int> key,
+    required List<int> sealed,
+    required String aad,
+  }) =>
+      open(key: key, sealed: sealed, aad: aad);
+
+  /// 信封 JSON 文本的 SHA-256（小写 hex）。签名规范哈希的是信封文本本身，
+  /// 不是密文字节——单独开一个入口，避免各处重复踩这个坑。
+  static Future<String> sha256HexOfEnvelope(String body) async {
+    final digest = dshsha.Sha256.hash(utf8.encode(body));
+    return digest.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  }
 }
 
 class DshSessionKeys {
@@ -109,19 +131,4 @@ class DshCryptoException implements Exception {
 
   @override
   String toString() => 'DshCryptoException: $message';
-
-  /// 与 [open] 同义，命名区分"配对阶段的公钥解密"，避免调用方误用会话密钥。
-  static Future<Uint8List> openPublic({
-    required List<int> key,
-    required List<int> sealed,
-    required String aad,
-  }) =>
-      open(key: key, sealed: sealed, aad: aad);
-
-  /// 信封 JSON 文本的 SHA-256（小写 hex）。签名规范里哈希的是"信封信封文本"，
-  /// 不是密文字节，这里单独开一个入口，避免各处重复踩。
-  static Future<String> sha256HexOfEnvelope(String body) async {
-    final digest = Sha256.hash(utf8.encode(body));
-    return digest.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-  }
 }
