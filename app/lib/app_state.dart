@@ -350,7 +350,13 @@ class AppState extends ChangeNotifier {
   /// 手机侧的断线原因太多（切网、锁屏、中转抖动、宿主换代），指望一条 SSE 从头活到尾不现实。
   /// 这里做三件事：① 掉线后按 1s/2s/4s/8s/15s 退避重连；② 40 秒没有任何帧（心跳 15 秒一发）
   /// 就当连接已死，主动断开重连；③ 重连成功后补一次历史，把断线期间漏掉的消息接回来。
+  /// 当前挂着流的客户端与会话，供 `session/resync-required` 触发补历史。
+  DshClient? _streamClient;
+  String? _streamSessionId;
+
   void _attachStream(DshClient c, String sessionId) {
+    _streamClient = c;
+    _streamSessionId = sessionId;
     _lastFrameAt = DateTime.now();
     _sub = c.stream(sessionId).listen((frame) {
       _lastFrameAt = DateTime.now();
@@ -449,8 +455,12 @@ class AppState extends ChangeNotifier {
     final outer = '${frame['type'] ?? ''}';
     if (outer == 'session/heartbeat') return;
     if (outer == 'session/resync-required') {
-      messages.add(ChatMessage(role: 'system', text: '这一段漏了消息，正在重新同步'));
-      notifyListeners();
+      // 宿主说「这一段漏了帧」：不猜丢了哪几条，直接按 JSONL 尾巴补一次历史。
+      // 补历史本身会去重（`_catchUp` 里对齐末条文本），用户看到的是列表被填齐，
+      // 而不是冒出一条「正在重新同步」的系统消息。
+      final c = _streamClient;
+      final sid = _streamSessionId;
+      if (c != null && sid != null) unawaited(_catchUp(c, sid));
       return;
     }
     final event = frame['event'];
