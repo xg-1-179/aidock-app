@@ -260,15 +260,79 @@ class _ChatPageState extends State<ChatPage> {
           ),
           border: mine ? null : Border.all(color: AidockColors.line),
         ),
-        child: Text(
-          m.text.isEmpty && m.streaming ? '…' : m.text,
-          style: TextStyle(
-            fontSize: 14,
-            height: 1.5,
-            color: mine ? const Color(0xFF06121F) : AidockColors.text,
-          ),
-        ),
+        child: _body(m, mine),
       ),
     );
+  }
+
+  /// 消息正文：用户气泡保持纯文本，助手消息按 ``` 切成「散文 / 代码」交替渲染。
+  ///
+  /// 不引第三方 Markdown 包：一是依赖越少构建越稳，二是手机窄屏上真正常用的只有
+  /// 代码块、行内代码和粗体这三样，手写一遍比调包更好控行高与配色。
+  Widget _body(ChatMessage m, bool mine) {
+    final text = m.text.isEmpty && m.streaming ? '…' : m.text;
+    final color = mine ? const Color(0xFF06121F) : AidockColors.text;
+    final base = TextStyle(fontSize: 14, height: 1.5, color: color);
+    if (mine || !text.contains('```')) {
+      return Text.rich(TextSpan(children: _inline(text, color)), style: base);
+    }
+    final parts = text.split('```');
+    final children = <Widget>[];
+    for (var i = 0; i < parts.length; i++) {
+      final part = parts[i];
+      if (part.trim().isEmpty) continue;
+      if (i.isOdd) {
+        // 首行可能是语言名（```dart），单独去掉，避免当成正文显示。
+        final body = part.replaceFirst(RegExp(r'^[A-Za-z0-9_+#.-]*\r?\n'), '');
+        children.add(Container(
+          width: double.infinity,
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF070B10),
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(color: AidockColors.line),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Text(
+              body.trimRight(),
+              style: const TextStyle(
+                  fontFamily: 'monospace', fontSize: 12.5, height: 1.45, color: Color(0xFFCFE3FF)),
+            ),
+          ),
+        ));
+      } else {
+        children.add(Text.rich(TextSpan(children: _inline(part, color)), style: base));
+      }
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: children);
+  }
+
+  /// 极简行内样式：`**粗体**` 与反引号包住的行内代码，其余原样。
+  List<TextSpan> _inline(String text, Color color) {
+    final spans = <TextSpan>[];
+    final pattern = RegExp(r'\*\*([^*]+)\*\*|`([^`]+)`');
+    var at = 0;
+    for (final m in pattern.allMatches(text)) {
+      if (m.start > at) spans.add(TextSpan(text: text.substring(at, m.start)));
+      final bold = m.group(1);
+      if (bold != null) {
+        spans.add(TextSpan(text: bold, style: const TextStyle(fontWeight: FontWeight.w700)));
+      } else {
+        spans.add(TextSpan(
+          text: m.group(2),
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 13,
+            color: color,
+            backgroundColor: const Color(0x1AFFFFFF),
+          ),
+        ));
+      }
+      at = m.end;
+    }
+    if (at < text.length) spans.add(TextSpan(text: text.substring(at)));
+    return spans;
   }
 }

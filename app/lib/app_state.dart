@@ -354,6 +354,11 @@ class AppState extends ChangeNotifier {
   Future<void> openSession(SessionItem item) async {
     await _sub?.cancel();
     _sub = null;
+    // 上一段会话若还挂着重连计时器，换会话时必须停掉，否则它会把新会话顶掉。
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    reconnecting = false;
+    _retryCount = 0;
     openSessionId = item.id;
     messages.clear();
     approvals.clear();
@@ -630,14 +635,26 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> disconnect() async {
+    // 断开＝彻底收摊：流、看门狗、重连计时器、审批卡、重连标记全清，否则
+    // 10 秒一次的心跳看门狗会在断开之后把旧客户端又拉起来。
     await _sub?.cancel();
     _sub = null;
+    _watchdog?.cancel();
+    _watchdog = null;
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    reconnecting = false;
+    _retryCount = 0;
+    _streamClient = null;
+    _streamSessionId = null;
     _client = null;
     _transport?.close();
     _transport = null;
     paired = false;
     sessions.clear();
     messages.clear();
+    approvals.clear();
+    streamingNow = false;
     openSessionId = null;
     notifyListeners();
   }
