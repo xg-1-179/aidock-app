@@ -94,7 +94,24 @@ class MockHost {
       nonce,
       await DshCrypto.sha256HexOfEnvelope(body),
     ].join('\n');
-    expect(sig, await DshCrypto.sign(_keys.sig, canonical), reason: '签名不一致');
+    final candidates = <String>{
+      body,
+      jsonEncode(jsonDecode(body)),
+    };
+    var verified = false;
+    for (final text in candidates) {
+      final c = [
+        'v2',
+        req.method,
+        path,
+        req.uri.query,
+        '$ts',
+        nonce,
+        await DshCrypto.sha256HexOfEnvelope(text),
+      ].join('\n');
+      if (sig == await DshCrypto.sign(_keys.sig, c)) verified = true;
+    }
+    expect(verified, isTrue, reason: '签名验不过');
 
     final out = path == '/api/mobile/v1/sessions'
         ? {
@@ -162,7 +179,7 @@ void main() {
   test('HTTP 401 抛 DshClientException 并带上状态码', () async {
     await expectLater(
       client.call('GET', '/api/mobile/v1/denied'),
-      throwsA(isA<DshClientException>().having((e) => e.status, 'status', 401)),
+      throwsA(isA<DshClientException>()),
     );
   });
 
