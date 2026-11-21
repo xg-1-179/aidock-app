@@ -38,6 +38,31 @@ class _ChatPageState extends State<ChatPage> {
         duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
   }
 
+  /// 断线重连提示条：不弹窗、不遮消息，只在顶部说明「现在是什么状态」。
+  Widget _reconnectBar() {
+    return Container(
+      width: double.infinity,
+      color: AidockColors.warn.withOpacity(0.14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(strokeWidth: 1.6, color: AidockColors.warn),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '连接中断，正在自动重连…历史消息还在，回来的消息会自动补上',
+              style: TextStyle(fontSize: 12.5, color: AidockColors.warn.withOpacity(0.95)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = widget.state;
@@ -55,6 +80,7 @@ class _ChatPageState extends State<ChatPage> {
       ),
       body: Column(
         children: [
+          if (s.reconnecting) _reconnectBar(),
           Expanded(
             child: AnimatedBuilder(
               animation: s,

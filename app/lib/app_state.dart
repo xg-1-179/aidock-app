@@ -88,6 +88,12 @@ class AppState extends ChangeNotifier {
   String? openSessionId;
   bool streamingNow = false;
   StreamSubscription<Map<String, dynamic>>? _sub;
+  Timer? _watchdog;
+  Timer? _retryTimer;
+  DateTime _lastFrameAt = DateTime.now();
+  int _retryCount = 0;
+  /// 断线自动重连中。界面据此画一条「正在重连」的提示，不打断正在看的消息。
+  bool reconnecting = false;
 
   static Uri normalizeHost(String raw) {
     var s = raw.trim();
@@ -318,19 +324,96 @@ class AppState extends ChangeNotifier {
       messages.add(ChatMessage(role: 'system', text: '历史读取失败：$e'));
     }
     notifyListeners();
-    _sub = c.stream(item.id).listen(_onFrame, onError: (Object e) {
+    _attachStream(c, item.id);
+  }
+
+  /// 挂上会话流，并在断开时自己重连。
+  ///
+  /// 手机侧的断线原因太多（切网、锁屏、中转抖动、宿主换代），指望一条 SSE 从头活到尾不现实。
+  /// 这里做三件事：① 掉线后按 1s/2s/4s/8s/15s 退避重连；② 40 秒没有任何帧（心跳 15 秒一发）
+  /// 就当连接已死，主动断开重连；③ 重连成功后补一次历史，把断线期间漏掉的消息接回来。
+  void _attachStream(DshClient c, String sessionId) {
+    _lastFrameAt = DateTime.now();
+    _sub = c.stream(sessionId).listen((frame) {
+      _lastFrameAt = DateTime.now();
+      if (reconnecting) {
+        reconnecting = false;
+        _retryCount = 0;
+        error = null;
+        notifyListeners();
+      }
+      _onFrame(frame);
+    }, onError: (Object e) {
       streamingNow = false;
-      messages.add(ChatMessage(role: 'system', text: '流断开：$e'));
-      notifyListeners();
+      _scheduleReconnect(c, sessionId, '$e');
     }, onDone: () {
       streamingNow = false;
-      notifyListeners();
+      _scheduleReconnect(c, sessionId, '连接已结束');
     });
+    _watchdog?.cancel();
+    _watchdog = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (openSessionId != sessionId) return;
+      if (DateTime.now().difference(_lastFrameAt).inSeconds < 40) return;
+      _retryCount = max(_retryCount, 1).toInt();
+      _sub?.cancel();
+      _sub = null;
+      _scheduleReconnect(c, sessionId, '心跳超时');
+    });
+  }
+
+  void _scheduleReconnect(DshClient c, String sessionId, String reason) {
+    if (openSessionId != sessionId) return;
+    _retryTimer?.cancel();
+    reconnecting = true;
+    streamingNow = false;
+    notifyListeners();
+    final shift = min(_retryCount, 4).toInt();
+    final seconds = min(15, 1 << shift).toInt();
+    _retryCount++;
+    _retryTimer = Timer(Duration(seconds: seconds), () async {
+      if (openSessionId != sessionId) return;
+      try {
+        await _catchUp(c, sessionId);
+        _attachStream(c, sessionId);
+      } catch (e) {
+        if (openSessionId != sessionId) return;
+        _scheduleReconnect(c, sessionId, '$e');
+      }
+    });
+  }
+
+  /// 重连前补历史：只把断线期间新出现的消息接到尾巴上，不重刷整段。
+  Future<void> _catchUp(DshClient c, String sessionId) async {
+    final rows = await c.messages(sessionId, limit: 20);
+    final incoming = <ChatMessage>[];
+    for (final row in rows) {
+      final role = '${row['role'] ?? row['author'] ?? ''}';
+      final text = _textOfMessage(row);
+      if (text.isEmpty) continue;
+      incoming.add(ChatMessage(role: role == 'user' || role == 'human' ? 'user' : 'assistant', text: text));
+    }
+    if (incoming.isEmpty) return;
+    // 尾巴对齐：把已显示的最后一两条与新历史的最前一条比，避免重复插入同一段。
+    final tail = messages.isEmpty ? null : messages.last.text;
+    for (final m in incoming) {
+      final dup = tail != null && (m.text == tail ||
+          (messages.length >= 1 && messages[messages.length - 1].text == m.text));
+      if (dup) continue;
+      if (messages.any((x) => x.role == m.role && x.text == m.text)) continue;
+      messages.add(m);
+    }
+    notifyListeners();
   }
 
   void closeSession() {
     _sub?.cancel();
     _sub = null;
+    _watchdog?.cancel();
+    _watchdog = null;
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    reconnecting = false;
+    _retryCount = 0;
     openSessionId = null;
     messages.clear();
     approvals.clear();
