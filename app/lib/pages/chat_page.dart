@@ -626,6 +626,17 @@ class _ChatPageState extends State<ChatPage> {
   /// 代码块、行内代码和粗体这三样，手写一遍比调包更好控行高与配色。
   /// 气泡里的图片：历史图按 `attachmentId` 现取（`AppState._hydrateImages`），
   /// 自己刚发的那张直接用本地字节，所以一发出就能看见。
+  Widget _body(ChatMessage m, bool mine) {
+    final text = m.text.isEmpty && m.streaming ? '…' : m.text;
+    final body = MessageBody(text: text, mine: mine, streaming: m.streaming);
+    if (m.images.isEmpty) return body;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [_images(m), body],
+    );
+  }
+
   Widget _images(ChatMessage m) {
     if (m.images.isEmpty) return const SizedBox.shrink();
     final children = <Widget>[];

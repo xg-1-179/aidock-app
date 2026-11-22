@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app_state.dart';
-import '../keepalive.dart';
+import '../keepalive.dart' as keepalive;
 import '../theme.dart';
 import 'artifacts_page.dart';
 import 'about_page.dart';
@@ -122,7 +122,7 @@ class _MorePageState extends State<MorePage> {
                 title: '让系统别杀后台',
                 subtitle: '加入电池优化白名单，锁屏时也能收消息',
                 onTap: () async {
-                  await KeepAlive.requestBatteryExemption();
+                  await keepalive.KeepAlive.requestBatteryExemption();
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('已打开系统设置，找到 AIDock 选「不限制」')),

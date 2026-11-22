@@ -33,6 +33,8 @@ jobs:
         run: |
           cd app
           flutter create --platforms=android --project-name aidock --org com.aidock .
+          # flutter create 会塞一个引用 MyApp 的默认 widget_test，删掉免得 analyze/test 挂。
+          rm -f test/widget_test.dart
           python3 ../scripts/patch_android_manifest.py
           python3 ../scripts/patch_android_notify.py
           pip install --quiet pillow
