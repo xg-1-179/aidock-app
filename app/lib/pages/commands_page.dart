@@ -223,7 +223,7 @@ class _CommandsPageState extends State<CommandsPage> {
           children: [
             Text(
               title,
-              style: const TextStyle(
+              style:  TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,
                 color: AidockColors.textDim,
@@ -233,7 +233,7 @@ class _CommandsPageState extends State<CommandsPage> {
             const SizedBox(width: 6),
             Text(
               '${items.length}',
-              style: const TextStyle(fontSize: 11.5, color: AidockColors.textDim),
+              style:  TextStyle(fontSize: 11.5, color: AidockColors.textDim),
             ),
           ],
         ),
@@ -243,12 +243,12 @@ class _CommandsPageState extends State<CommandsPage> {
           padding: const EdgeInsets.only(bottom: 6),
           child: Text(
             emptyHint,
-            style: const TextStyle(fontSize: 12, color: AidockColors.textDim),
+            style:  TextStyle(fontSize: 12, color: AidockColors.textDim),
           ),
         )
       else
         ..._rows(items),
-      const Divider(height: 18, thickness: 1, color: AidockColors.line),
+       Divider(height: 18, thickness: 1, color: AidockColors.line),
     ];
   }
 
@@ -266,7 +266,7 @@ class _CommandsPageState extends State<CommandsPage> {
         '/${command.name}',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
+        style:  TextStyle(
           fontSize: 13.5,
           fontFamily: 'monospace',
           color: AidockColors.accent,
@@ -281,7 +281,7 @@ class _CommandsPageState extends State<CommandsPage> {
               command.description,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 11.5, color: AidockColors.textDim),
+              style:  TextStyle(fontSize: 11.5, color: AidockColors.textDim),
             ),
           if (command.hint != null)
             Padding(
@@ -296,7 +296,7 @@ class _CommandsPageState extends State<CommandsPage> {
                   command.hint!,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 10.5, color: AidockColors.textDim),
+                  style:  TextStyle(fontSize: 10.5, color: AidockColors.textDim),
                 ),
               ),
             ),
@@ -321,7 +321,7 @@ class _CommandsPageState extends State<CommandsPage> {
         child: Text(
           text,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 13, color: AidockColors.textDim),
+          style:  TextStyle(fontSize: 13, color: AidockColors.textDim),
         ),
       ),
     );
@@ -337,7 +337,7 @@ class _CommandsPageState extends State<CommandsPage> {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13, color: AidockColors.textDim),
+              style:  TextStyle(fontSize: 13, color: AidockColors.textDim),
             ),
             const SizedBox(height: 14),
             OutlinedButton(

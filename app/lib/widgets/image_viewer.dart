@@ -168,7 +168,7 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
                           '双击放大 · 双指缩放',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style:  TextStyle(
                             fontSize: 11.5,
                             height: 1.3,
                             color: AidockColors.textDim,
@@ -187,7 +187,7 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
                         ),
                         child: Text(
                           '${_index + 1} / $total',
-                          style: const TextStyle(
+                          style:  TextStyle(
                             fontSize: 12,
                             color: AidockColors.text,
                           ),
@@ -388,7 +388,7 @@ class _BrokenImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return  Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

@@ -92,7 +92,7 @@ class _ArtifactsPageState extends State<ArtifactsPage> {
           body: s.loadingArtifacts && s.artifacts.isEmpty
               ? const Center(child: CircularProgressIndicator())
               : s.artifacts.isEmpty
-                  ? const Center(
+                  ?  Center(
                       child: Padding(
                         padding: EdgeInsets.all(24),
                         child: Text(
@@ -105,7 +105,7 @@ class _ArtifactsPageState extends State<ArtifactsPage> {
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                       itemCount: s.artifacts.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFF1E2733)),
+                      separatorBuilder: (_, __) => Divider(height: 1, color: AidockColors.line),
                       itemBuilder: (context, i) {
                         final a = s.artifacts[i];
                         final path = '${a['path'] ?? ''}';
@@ -113,7 +113,7 @@ class _ArtifactsPageState extends State<ArtifactsPage> {
                         final ok = status == 'ok';
                         final color = ok
                             ? AidockColors.ok
-                            : (status == 'missing' ? const Color(0xFFE0B34D) : AidockColors.textDim);
+                            : (status == 'missing' ? AidockColors.warn : AidockColors.textDim);
                         return ListTile(
                           contentPadding: EdgeInsets.zero,
                           leading: Icon(
@@ -131,7 +131,7 @@ class _ArtifactsPageState extends State<ArtifactsPage> {
                                 .join('\n'),
                             maxLines: 3,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 11, color: AidockColors.textDim, height: 1.5),
+                            style:  TextStyle(fontSize: 11, color: AidockColors.textDim, height: 1.5),
                           ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,

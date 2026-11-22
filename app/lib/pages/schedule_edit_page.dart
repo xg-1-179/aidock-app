@@ -251,14 +251,14 @@ class _ScheduleEditPageState extends State<ScheduleEditPage> {
           const SizedBox(height: 10),
           Text(
             _preview,
-            style: const TextStyle(fontSize: 12.5, height: 1.5, color: AidockColors.textDim),
+            style:  TextStyle(fontSize: 12.5, height: 1.5, color: AidockColors.textDim),
           ),
           const SizedBox(height: 6),
           Text(
             bound
                 ? '结果会回到这条会话里。'
                 : '没绑定会话：宿主会为它新开一条会话来跑。',
-            style: const TextStyle(fontSize: 12.5, height: 1.5, color: AidockColors.textDim),
+            style:  TextStyle(fontSize: 12.5, height: 1.5, color: AidockColors.textDim),
           ),
           if (_error != null) ...[
             const SizedBox(height: 14),
@@ -272,7 +272,7 @@ class _ScheduleEditPageState extends State<ScheduleEditPage> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Padding(
+                   Padding(
                     padding: EdgeInsets.only(top: 2),
                     child: Icon(Icons.error_outline, size: 16, color: AidockColors.danger),
                   ),
@@ -280,7 +280,7 @@ class _ScheduleEditPageState extends State<ScheduleEditPage> {
                   Expanded(
                     child: Text(
                       _error!,
-                      style: const TextStyle(
+                      style:  TextStyle(
                         fontSize: 12.5,
                         height: 1.5,
                         color: AidockColors.text,
@@ -305,7 +305,7 @@ class _ScheduleEditPageState extends State<ScheduleEditPage> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: _saving
-                ? const SizedBox(
+                ?  SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2, color: AidockColors.bg),
@@ -322,7 +322,7 @@ class _ScheduleEditPageState extends State<ScheduleEditPage> {
       padding: const EdgeInsets.only(bottom: 8),
       child: Text(
         text,
-        style: const TextStyle(
+        style:  TextStyle(
           fontSize: 12.5,
           fontWeight: FontWeight.w600,
           color: AidockColors.textDim,

@@ -47,12 +47,12 @@ class _JobsPageState extends State<JobsPage> {
               row.label,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 14, height: 1.5, color: AidockColors.text),
+              style:  TextStyle(fontSize: 14, height: 1.5, color: AidockColors.text),
             ),
             const SizedBox(height: 10),
             Text(
               '已跑 ${_duration(row.elapsed)}，取消会把它停掉。',
-              style: const TextStyle(fontSize: 12.5, height: 1.5, color: AidockColors.textDim),
+              style:  TextStyle(fontSize: 12.5, height: 1.5, color: AidockColors.textDim),
             ),
           ],
         ),
@@ -132,7 +132,7 @@ class _JobsPageState extends State<JobsPage> {
   }
 
   List<Widget> _emptyBody() {
-    return const [
+    return  [
       SizedBox(height: 72),
       Icon(Icons.memory, size: 32, color: AidockColors.textDim),
       SizedBox(height: 14),
@@ -160,7 +160,7 @@ class _JobsPageState extends State<JobsPage> {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style:  TextStyle(
               fontSize: 12.5,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.3,
@@ -209,7 +209,7 @@ class _JobsPageState extends State<JobsPage> {
                     const SizedBox(width: 8),
                     Text(
                       _duration(row.elapsed),
-                      style: const TextStyle(fontSize: 12, color: AidockColors.textDim),
+                      style:  TextStyle(fontSize: 12, color: AidockColors.textDim),
                     ),
                     const SizedBox(width: 8),
                     Flexible(
@@ -217,7 +217,7 @@ class _JobsPageState extends State<JobsPage> {
                         '· ${_controller.titleOf(row.sessionId)}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12, color: AidockColors.textDim),
+                        style:  TextStyle(fontSize: 12, color: AidockColors.textDim),
                       ),
                     ),
                   ],
@@ -274,7 +274,7 @@ class _JobsPageState extends State<JobsPage> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
+           Padding(
             padding: EdgeInsets.only(top: 2),
             child: Icon(Icons.error_outline, size: 16, color: AidockColors.danger),
           ),
@@ -282,7 +282,7 @@ class _JobsPageState extends State<JobsPage> {
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(fontSize: 12.5, height: 1.5, color: AidockColors.text),
+              style:  TextStyle(fontSize: 12.5, height: 1.5, color: AidockColors.text),
             ),
           ),
         ],

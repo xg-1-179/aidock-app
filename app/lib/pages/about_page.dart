@@ -57,7 +57,7 @@ class _AboutPageState extends State<AboutPage> {
               onPressed: widget.onLogout,
               style: OutlinedButton.styleFrom(
                 foregroundColor: AidockColors.danger,
-                side: const BorderSide(color: AidockColors.line),
+                side:  BorderSide(color: AidockColors.line),
                 minimumSize: const Size.fromHeight(46),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -90,7 +90,7 @@ class _AboutPageState extends State<AboutPage> {
               color: AidockColors.accentSoft,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(
+            child:  Icon(
               Icons.smartphone,
               size: 26,
               color: AidockColors.accent,
@@ -101,7 +101,7 @@ class _AboutPageState extends State<AboutPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                 Text(
                   'AIDock',
                   style: TextStyle(
                     fontSize: 20,
@@ -112,7 +112,7 @@ class _AboutPageState extends State<AboutPage> {
                 const SizedBox(height: 4),
                 Text(
                   '版本 ${widget.currentVersion}',
-                  style: const TextStyle(
+                  style:  TextStyle(
                     fontSize: 13,
                     color: AidockColors.textDim,
                   ),
@@ -130,7 +130,7 @@ class _AboutPageState extends State<AboutPage> {
       padding: const EdgeInsets.only(bottom: 8, left: 4),
       child: Text(
         title,
-        style: const TextStyle(
+        style:  TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w600,
           color: AidockColors.text,
@@ -157,14 +157,14 @@ class _AboutPageState extends State<AboutPage> {
     final children = <Widget>[
       Row(
         children: [
-          const Expanded(
+           Expanded(
             child: Text(
               '检查更新',
               style: TextStyle(fontSize: 14, color: AidockColors.text),
             ),
           ),
           if (_checking)
-            const SizedBox(
+             SizedBox(
               width: 18,
               height: 18,
               child: CircularProgressIndicator(
@@ -192,7 +192,7 @@ class _AboutPageState extends State<AboutPage> {
           child: LinearProgressIndicator(
             minHeight: 2,
             backgroundColor: AidockColors.surfaceAlt,
-            valueColor: const AlwaysStoppedAnimation<Color>(AidockColors.accent),
+            valueColor:  AlwaysStoppedAnimation<Color>(AidockColors.accent),
           ),
         ),
       );
@@ -202,7 +202,7 @@ class _AboutPageState extends State<AboutPage> {
           padding: const EdgeInsets.only(top: 8),
           child: Text(
             _error!,
-            style: const TextStyle(
+            style:  TextStyle(
               fontSize: 12,
               height: 1.5,
               color: AidockColors.danger,
@@ -218,7 +218,7 @@ class _AboutPageState extends State<AboutPage> {
           padding: const EdgeInsets.only(top: 8),
           child: Text(
             _checked ? '已经是最新版本。' : '点「检查」看看 GitHub 上有没有新安装包。',
-            style: const TextStyle(
+            style:  TextStyle(
               fontSize: 12,
               height: 1.5,
               color: AidockColors.textDim,
@@ -240,7 +240,7 @@ class _AboutPageState extends State<AboutPage> {
           Expanded(
             child: Text(
               '发现新版本 ${info.tag}',
-              style: const TextStyle(
+              style:  TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: AidockColors.ok,
@@ -249,7 +249,7 @@ class _AboutPageState extends State<AboutPage> {
           ),
           Text(
             info.sizeLabel,
-            style: const TextStyle(fontSize: 12, color: AidockColors.textDim),
+            style:  TextStyle(fontSize: 12, color: AidockColors.textDim),
           ),
         ],
       ),
@@ -262,7 +262,7 @@ class _AboutPageState extends State<AboutPage> {
             _notesPreview(info.notes),
             maxLines: 8,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style:  TextStyle(
               fontSize: 12,
               height: 1.6,
               color: AidockColors.textDim,
@@ -279,7 +279,7 @@ class _AboutPageState extends State<AboutPage> {
             value: _progress <= 0 ? null : _progress,
             minHeight: 3,
             backgroundColor: AidockColors.surfaceAlt,
-            valueColor: const AlwaysStoppedAnimation<Color>(AidockColors.accent),
+            valueColor:  AlwaysStoppedAnimation<Color>(AidockColors.accent),
           ),
         ),
       );
@@ -288,7 +288,7 @@ class _AboutPageState extends State<AboutPage> {
           padding: const EdgeInsets.only(top: 6),
           child: Text(
             '已下载 ${(_progress * 100).toStringAsFixed(0)}%',
-            style: const TextStyle(fontSize: 12, color: AidockColors.textDim),
+            style:  TextStyle(fontSize: 12, color: AidockColors.textDim),
           ),
         ),
       );
@@ -299,7 +299,7 @@ class _AboutPageState extends State<AboutPage> {
           padding: const EdgeInsets.only(top: 10),
           child: Text(
             _downloadError!,
-            style: const TextStyle(
+            style:  TextStyle(
               fontSize: 12,
               height: 1.5,
               color: AidockColors.danger,
@@ -311,7 +311,7 @@ class _AboutPageState extends State<AboutPage> {
     if (_savedPath != null) {
       out.add(const SizedBox(height: 12));
       out.add(
-        const Text(
+         Text(
           '安装包已存到手机上（去「文件」里点开即可安装）：',
           style: TextStyle(fontSize: 12, height: 1.5, color: AidockColors.textDim),
         ),
@@ -321,7 +321,7 @@ class _AboutPageState extends State<AboutPage> {
           padding: const EdgeInsets.only(top: 4),
           child: SelectableText(
             _savedPath!,
-            style: const TextStyle(fontSize: 12, height: 1.5, color: AidockColors.text),
+            style:  TextStyle(fontSize: 12, height: 1.5, color: AidockColors.text),
           ),
         ),
       );
@@ -393,13 +393,13 @@ class _AboutPageState extends State<AboutPage> {
           children: [
             Text(
               label,
-              style: const TextStyle(fontSize: 12, color: AidockColors.textDim),
+              style:  TextStyle(fontSize: 12, color: AidockColors.textDim),
             ),
             const Spacer(),
             InkWell(
               onTap: () => _copy(url, '$label链接已复制'),
               borderRadius: BorderRadius.circular(8),
-              child: const Padding(
+              child:  Padding(
                 padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 child: Text(
                   '复制',
@@ -412,7 +412,7 @@ class _AboutPageState extends State<AboutPage> {
         const SizedBox(height: 2),
         SelectableText(
           url,
-          style: const TextStyle(
+          style:  TextStyle(
             fontSize: 12.5,
             height: 1.4,
             color: AidockColors.text,
@@ -427,7 +427,7 @@ class _AboutPageState extends State<AboutPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+           Text(
             '这个 App 用 Flutter 写，扫描用 mobile_scanner，选图用 image_picker，'
             '偏好设置用 shared_preferences，和手机端通信用同仓库打包进来的 dsh_link_protocol。'
             '上面这些组件各自遵循原本的开源许可。',
@@ -466,7 +466,7 @@ class _AboutPageState extends State<AboutPage> {
       context: context,
       applicationName: 'AIDock',
       applicationVersion: widget.currentVersion,
-      applicationIcon: const Padding(
+      applicationIcon:  Padding(
         padding: EdgeInsets.all(8),
         child: Icon(Icons.smartphone, color: AidockColors.accent, size: 32),
       ),

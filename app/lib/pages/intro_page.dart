@@ -20,7 +20,7 @@ class IntroPage extends StatelessWidget {
               const Text('AIDock',
                   style: TextStyle(fontSize: 30, fontWeight: FontWeight.w700, letterSpacing: -0.5)),
               const SizedBox(height: 6),
-              const Text('手机连着你的电脑，随时接着聊。',
+               Text('手机连着你的电脑，随时接着聊。',
                   style: TextStyle(fontSize: 13, color: AidockColors.textDim)),
               const SizedBox(height: 28),
               _step(1, '电脑上打开连接页',
@@ -63,7 +63,7 @@ class IntroPage extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text('$n',
-                style: const TextStyle(
+                style:  TextStyle(
                     fontSize: 13, fontWeight: FontWeight.w600, color: AidockColors.accent)),
           ),
           const SizedBox(width: 14),
@@ -75,7 +75,7 @@ class IntroPage extends StatelessWidget {
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 6),
                 Text(body,
-                    style: const TextStyle(
+                    style:  TextStyle(
                         fontSize: 12.5, height: 1.65, color: AidockColors.textDim)),
               ],
             ),

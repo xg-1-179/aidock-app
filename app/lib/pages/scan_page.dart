@@ -84,7 +84,7 @@ class _ScanPageState extends State<ScanPage> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  const Text(
+                   Text(
                     '扫不到也可以返回手输地址和六位码',
                     style: TextStyle(fontSize: 11.5, color: AidockColors.textDim),
                   ),

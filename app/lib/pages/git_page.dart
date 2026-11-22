@@ -85,7 +85,7 @@ class _GitPageState extends State<GitPage> {
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                     child: Text(
                       text.isEmpty ? '（空）' : text,
-                      style: const TextStyle(
+                      style:  TextStyle(
                         fontSize: 12,
                         height: 1.5,
                         fontFamily: 'monospace',
@@ -149,7 +149,7 @@ class _GitPageState extends State<GitPage> {
                         style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 8),
                     if (s.gitCommits.isEmpty)
-                      const Text('（没有提交，或者仓库是空的）',
+                       Text('（没有提交，或者仓库是空的）',
                           style: TextStyle(fontSize: 13, color: AidockColors.textDim)),
                     for (final c in s.gitCommits) _commitRow(c),
                   ],
@@ -167,7 +167,7 @@ class _GitPageState extends State<GitPage> {
         color: AidockColors.surface,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Text(text, style: const TextStyle(fontSize: 12, color: AidockColors.textDim)),
+      child: Text(text, style:  TextStyle(fontSize: 12, color: AidockColors.textDim)),
     );
   }
 
@@ -190,7 +190,7 @@ class _GitPageState extends State<GitPage> {
             '${r['status'] ?? ''}'
             '${(r['additions'] is num && (r['additions'] as num) > 0) ? '  +${r['additions']}' : ''}'
             '${(r['deletions'] is num && (r['deletions'] as num) > 0) ? '  -${r['deletions']}' : ''}',
-            style: const TextStyle(fontSize: 11, color: AidockColors.textDim),
+            style:  TextStyle(fontSize: 11, color: AidockColors.textDim),
           ),
           trailing: const Icon(Icons.chevron_right, size: 18),
           onTap: () => _showDiff('${r['path'] ?? ''}', path: '${r['path'] ?? ''}'),
@@ -214,7 +214,7 @@ class _GitPageState extends State<GitPage> {
       subtitle: Text(meta,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 11, color: AidockColors.textDim)),
+          style:  TextStyle(fontSize: 11, color: AidockColors.textDim)),
       onTap: short.isEmpty ? null : () => _showDiff(short, commit: short),
     );
   }

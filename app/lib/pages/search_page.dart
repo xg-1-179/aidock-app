@@ -133,13 +133,13 @@ class _SearchPageState extends State<SearchPage> {
             padding: const EdgeInsets.only(bottom: 2),
             child: Text(
               '${_c.hits.length} 条命中',
-              style: const TextStyle(fontSize: 12, color: AidockColors.textDim),
+              style:  TextStyle(fontSize: 12, color: AidockColors.textDim),
             ),
           );
         }
         final i = index - 1;
         if (i >= _c.hits.length) {
-          return const Padding(
+          return  Padding(
             padding: EdgeInsets.only(top: 4),
             child: Text(
               '宿主一次只回 20 条，命中更多时把关键词写细一点。',
@@ -179,7 +179,7 @@ class _SearchPageState extends State<SearchPage> {
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 text: TextSpan(
-                  style: const TextStyle(
+                  style:  TextStyle(
                     fontSize: 12.5,
                     height: 1.5,
                     color: AidockColors.textDim,
@@ -210,7 +210,7 @@ class _SearchPageState extends State<SearchPage> {
       if (at > from) spans.add(TextSpan(text: text.substring(from, at)));
       spans.add(TextSpan(
         text: text.substring(at, end),
-        style: const TextStyle(
+        style:  TextStyle(
           color: AidockColors.accent,
           fontWeight: FontWeight.w600,
         ),
@@ -234,13 +234,13 @@ class _SearchPageState extends State<SearchPage> {
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 15, height: 1.4, color: AidockColors.text),
+              style:  TextStyle(fontSize: 15, height: 1.4, color: AidockColors.text),
             ),
             const SizedBox(height: 6),
             Text(
               note,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12.5, height: 1.5, color: AidockColors.textDim),
+              style:  TextStyle(fontSize: 12.5, height: 1.5, color: AidockColors.textDim),
             ),
           ],
         ),
@@ -260,7 +260,7 @@ class _SearchPageState extends State<SearchPage> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
+           Padding(
             padding: EdgeInsets.only(top: 2),
             child: Icon(Icons.error_outline, size: 16, color: AidockColors.danger),
           ),
@@ -268,7 +268,7 @@ class _SearchPageState extends State<SearchPage> {
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(fontSize: 12.5, height: 1.5, color: AidockColors.text),
+              style:  TextStyle(fontSize: 12.5, height: 1.5, color: AidockColors.text),
             ),
           ),
           if (trimmed.length >= SearchController.minChars)

@@ -54,7 +54,7 @@ class CodeBlock extends StatelessWidget {
                       lang,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style:  TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 10.5,
                         color: AidockColors.textDim,
@@ -117,7 +117,7 @@ class _CodeAction extends StatelessWidget {
               const SizedBox(width: 3),
               Text(
                 label,
-                style: const TextStyle(
+                style:  TextStyle(
                   fontSize: 11,
                   height: 1.1,
                   color: AidockColors.textDim,

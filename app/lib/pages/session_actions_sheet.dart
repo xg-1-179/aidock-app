@@ -129,7 +129,7 @@ class _SessionActionsSheetState extends State<_SessionActionsSheet> {
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('删除', style: TextStyle(color: AidockColors.danger)),
+            child:  Text('删除', style: TextStyle(color: AidockColors.danger)),
           ),
         ],
       ),
@@ -160,7 +160,7 @@ class _SessionActionsSheetState extends State<_SessionActionsSheet> {
                   heading,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13, color: AidockColors.textDim),
+                  style:  TextStyle(fontSize: 13, color: AidockColors.textDim),
                 ),
               ),
               if (error != null)
@@ -176,7 +176,7 @@ class _SessionActionsSheetState extends State<_SessionActionsSheet> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
+                         Icon(
                           Icons.error_outline_rounded,
                           size: 18,
                           color: AidockColors.danger,
@@ -185,7 +185,7 @@ class _SessionActionsSheetState extends State<_SessionActionsSheet> {
                         Expanded(
                           child: Text(
                             error,
-                            style: const TextStyle(
+                            style:  TextStyle(
                               fontSize: 12,
                               height: 1.5,
                               color: AidockColors.danger,
@@ -197,7 +197,7 @@ class _SessionActionsSheetState extends State<_SessionActionsSheet> {
                   ),
                 ),
               if (busy)
-                const Padding(
+                 Padding(
                   padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
                   child: LinearProgressIndicator(
                     minHeight: 2,
@@ -226,7 +226,7 @@ class _SessionActionsSheetState extends State<_SessionActionsSheet> {
                 enabled: !busy,
                 onTap: _export,
               ),
-              const Divider(height: 1, thickness: 1, color: AidockColors.line),
+               Divider(height: 1, thickness: 1, color: AidockColors.line),
               _tile(
                 icon: Icons.delete_outline_rounded,
                 title: '删除会话',
@@ -247,20 +247,21 @@ class _SessionActionsSheetState extends State<_SessionActionsSheet> {
     required IconData icon,
     required String title,
     String? subtitle,
-    Color color = AidockColors.text,
+    Color? color,
     bool enabled = true,
     required VoidCallback onTap,
   }) {
+    final ink = color ?? AidockColors.text;
     return ListTile(
       enabled: enabled,
-      leading: Icon(icon, size: 20, color: enabled ? color : AidockColors.textDim),
+      leading: Icon(icon, size: 20, color: enabled ? ink : AidockColors.textDim),
       title: Text(
         title,
-        style: TextStyle(fontSize: 14, color: enabled ? color : AidockColors.textDim),
+        style: TextStyle(fontSize: 14, color: enabled ? ink : AidockColors.textDim),
       ),
       subtitle: subtitle == null
           ? null
-          : Text(subtitle, style: const TextStyle(fontSize: 11, color: AidockColors.textDim)),
+          : Text(subtitle, style:  TextStyle(fontSize: 11, color: AidockColors.textDim)),
       onTap: enabled ? onTap : null,
     );
   }

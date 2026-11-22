@@ -90,7 +90,7 @@ class _SessionsPageState extends State<SessionsPage> {
                 title: Text(m.host, style: const TextStyle(fontSize: 13.5)),
                 subtitle: Text(
                   m.permissions.isEmpty ? '这台还没记权限' : '权限：${m.permissions}',
-                  style: const TextStyle(fontSize: 11, color: AidockColors.textDim),
+                  style:  TextStyle(fontSize: 11, color: AidockColors.textDim),
                 ),
                 onTap: () => Navigator.pop(ctx, m),
               ),
@@ -114,7 +114,7 @@ class _SessionsPageState extends State<SessionsPage> {
             Container(
               width: 8,
               height: 8,
-              decoration: const BoxDecoration(color: AidockColors.ok, shape: BoxShape.circle),
+              decoration:  BoxDecoration(color: AidockColors.ok, shape: BoxShape.circle),
             ),
             const SizedBox(width: 8),
             const Text('会话'),
@@ -128,11 +128,11 @@ class _SessionsPageState extends State<SessionsPage> {
                     Flexible(
                       child: Text(state.hostLabel,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 12, color: AidockColors.textDim)),
+                          style:  TextStyle(fontSize: 12, color: AidockColors.textDim)),
                     ),
                     if (state.machines.length > 1) ...[
                       const SizedBox(width: 4),
-                      const Icon(Icons.swap_horiz_rounded, size: 14, color: AidockColors.textDim),
+                       Icon(Icons.swap_horiz_rounded, size: 14, color: AidockColors.textDim),
                     ],
                   ],
                 ),
@@ -186,7 +186,7 @@ class _SessionsPageState extends State<SessionsPage> {
                   ));
                 },
           backgroundColor: AidockColors.accent,
-          foregroundColor: Colors.black,
+          foregroundColor: AidockColors.onAccent,
           icon: const Icon(Icons.add_comment_rounded, size: 19),
           label: const Text('新建会话', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         ),
@@ -232,7 +232,7 @@ class _SessionsPageState extends State<SessionsPage> {
                         _q.text.trim().isEmpty
                             ? '电脑上还没有会话'
                             : '没有匹配「${_q.text.trim()}」的会话',
-                        style: const TextStyle(color: AidockColors.textDim, fontSize: 13.5)),
+                        style:  TextStyle(color: AidockColors.textDim, fontSize: 13.5)),
                   ),
                   const SizedBox(height: 6),
                   Center(
@@ -240,7 +240,7 @@ class _SessionsPageState extends State<SessionsPage> {
                         _q.text.trim().isEmpty
                             ? '在电脑上新建一个会话再下拉刷新'
                             : '换个关键词试试，或用右下角新建会话',
-                        style: const TextStyle(color: AidockColors.textDim, fontSize: 12)),
+                        style:  TextStyle(color: AidockColors.textDim, fontSize: 12)),
                   ),
                 ],
               )
@@ -285,7 +285,7 @@ class _SessionsPageState extends State<SessionsPage> {
                                           fontSize: 14.5, fontWeight: FontWeight.w600)),
                                 ),
                                 if (s.pinned)
-                                  const Icon(Icons.push_pin_rounded,
+                                   Icon(Icons.push_pin_rounded,
                                       size: 14, color: AidockColors.textDim),
                               ],
                             ),
@@ -294,7 +294,7 @@ class _SessionsPageState extends State<SessionsPage> {
                               Text(s.subtitle,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                                  style:  TextStyle(
                                       fontSize: 12.5, color: AidockColors.textDim, height: 1.45)),
                             ],
                           ],
@@ -439,7 +439,7 @@ class _SessionsPageState extends State<SessionsPage> {
         child: ListView(
           shrinkWrap: true,
           children: [
-            const Padding(
+             Padding(
               padding: EdgeInsets.fromLTRB(18, 16, 18, 6),
               child: Text('在哪个工作区新建会话？',
                   style: TextStyle(fontSize: 13, color: AidockColors.textDim)),

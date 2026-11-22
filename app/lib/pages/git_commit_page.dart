@@ -67,10 +67,10 @@ class _GitCommitPageState extends State<GitCommitPage> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AidockColors.surface,
-        title: Text(title, style: const TextStyle(fontSize: 16, color: AidockColors.text)),
+        title: Text(title, style:  TextStyle(fontSize: 16, color: AidockColors.text)),
         content: Text(
           message,
-          style: const TextStyle(fontSize: 13, color: AidockColors.textDim),
+          style:  TextStyle(fontSize: 13, color: AidockColors.textDim),
         ),
         actions: [
           TextButton(
@@ -172,7 +172,7 @@ class _GitCommitPageState extends State<GitCommitPage> {
         path,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 13, color: AidockColors.text),
+        style:  TextStyle(fontSize: 13, color: AidockColors.text),
       ),
       subtitle: Row(
         children: [
@@ -186,19 +186,19 @@ class _GitCommitPageState extends State<GitCommitPage> {
               ),
               child: Text(
                 status,
-                style: const TextStyle(fontSize: 10.5, color: AidockColors.textDim),
+                style:  TextStyle(fontSize: 10.5, color: AidockColors.textDim),
               ),
             ),
           if (binary)
-            const Text('二进制', style: TextStyle(fontSize: 11, color: AidockColors.textDim))
+             Text('二进制', style: TextStyle(fontSize: 11, color: AidockColors.textDim))
           else if (additions != null || deletions != null)
             Text(
               '+${additions ?? 0} -${deletions ?? 0}',
-              style: const TextStyle(fontSize: 11, color: AidockColors.textDim),
+              style:  TextStyle(fontSize: 11, color: AidockColors.textDim),
             ),
         ],
       ),
-      trailing: const Text(
+      trailing:  Text(
         '点一下暂存',
         style: TextStyle(fontSize: 11, color: AidockColors.accent),
       ),
@@ -217,15 +217,15 @@ class _GitCommitPageState extends State<GitCommitPage> {
         path,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 13, color: AidockColors.textDim),
+        style:  TextStyle(fontSize: 13, color: AidockColors.textDim),
       ),
       subtitle: status.isEmpty
           ? null
           : Text(
               status,
-              style: const TextStyle(fontSize: 11, color: AidockColors.textDim),
+              style:  TextStyle(fontSize: 11, color: AidockColors.textDim),
             ),
-      trailing: const Text(
+      trailing:  Text(
         '取消暂存',
         style: TextStyle(fontSize: 11, color: AidockColors.textDim),
       ),
@@ -256,7 +256,7 @@ class _GitCommitPageState extends State<GitCommitPage> {
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
                 hint,
-                style: const TextStyle(fontSize: 11.5, color: AidockColors.textDim),
+                style:  TextStyle(fontSize: 11.5, color: AidockColors.textDim),
               ),
             ),
           SizedBox(
@@ -299,7 +299,7 @@ class _SectionLabel extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 4),
       child: Text(
         text,
-        style: const TextStyle(
+        style:  TextStyle(
           fontSize: 12.5,
           fontWeight: FontWeight.w600,
           color: AidockColors.textDim,
@@ -321,7 +321,7 @@ class _Hint extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 6),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 12, color: AidockColors.textDim),
+        style:  TextStyle(fontSize: 12, color: AidockColors.textDim),
       ),
     );
   }

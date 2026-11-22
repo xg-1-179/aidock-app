@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'keepalive.dart';
 import 'notify.dart';
+import 'theme.dart';
 
 /// 待发的一张图：文件名、MIME、原始字节。
 /// 一条「暂时发不出去」的消息：网络断了先存本地，等连上按顺序补发。
@@ -289,11 +290,23 @@ class AppState extends ChangeNotifier {
 
   // ---- 界面偏好：字号 ----
   static const String _kTextScale = 'aidock.textScale';
+  static const String _kLightMode = 'aidock.lightMode';
   static const String _kQuiet = 'aidock.quiet';
   static const String _kDrafts = 'aidock.drafts';
   static const String _kOutbox = 'aidock.outbox';
   static const String _kLastSession = 'aidock.lastSession';
   double textScale = 1.0;
+
+  /// 浅色模式（默认深色）。切换后立即重绘，并写进本地偏好。
+  bool lightMode = false;
+
+  Future<void> setLightMode(bool value) async {
+    lightMode = value;
+    AidockColors.apply(value);
+    notifyListeners();
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_kLightMode, value);
+  }
 
   // ---- 运行日志（导出给开发者看的那种，只有最近 200 行）----
   final List<String> _log = [];
@@ -1706,6 +1719,8 @@ class AppState extends ChangeNotifier {
   Future<void> loadUiPrefs() async {
     final p = await SharedPreferences.getInstance();
     textScale = (p.getDouble(_kTextScale) ?? 1.0).clamp(0.85, 1.6);
+    lightMode = p.getBool(_kLightMode) ?? false;
+    AidockColors.apply(lightMode);
     notifyListeners();
   }
 

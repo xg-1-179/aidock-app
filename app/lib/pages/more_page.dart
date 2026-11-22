@@ -116,6 +116,7 @@ class _MorePageState extends State<MorePage> {
               const SizedBox(height: 24),
               _section('界面'),
               _quietTile(s),
+              _themeTile(s),
               _textScaleTile(s),
               _linkTile(
                 icon: Icons.battery_saver_outlined,
@@ -137,7 +138,7 @@ class _MorePageState extends State<MorePage> {
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => AboutPage(
-                      currentVersion: '0.17.0',
+                      currentVersion: '0.18.0',
                       onLogout: () => s.forgetSaved(),
                     ),
                   ),
@@ -168,7 +169,7 @@ class _MorePageState extends State<MorePage> {
                 ),
                 child: Text(
                   s.logLines.isEmpty ? '（暂时没有日志）' : s.logText,
-                  style: const TextStyle(
+                  style:  TextStyle(
                     fontSize: 12,
                     height: 1.45,
                     fontFamily: 'monospace',
@@ -194,7 +195,7 @@ class _MorePageState extends State<MorePage> {
       contentPadding: EdgeInsets.zero,
       leading: Icon(icon, color: enabled ? AidockColors.accent : AidockColors.textDim),
       title: Text(title, style: TextStyle(color: enabled ? null : AidockColors.textDim)),
-      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: AidockColors.textDim)),
+      subtitle: Text(subtitle, style:  TextStyle(fontSize: 12, color: AidockColors.textDim)),
       trailing: const Icon(Icons.chevron_right, size: 20),
       enabled: enabled,
       onTap: enabled ? onTap : null,
@@ -231,7 +232,7 @@ class _MorePageState extends State<MorePage> {
   Widget _hint(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Text(text, style: const TextStyle(fontSize: 13, color: AidockColors.textDim)),
+      child: Text(text, style:  TextStyle(fontSize: 13, color: AidockColors.textDim)),
     );
   }
 
@@ -248,7 +249,7 @@ class _MorePageState extends State<MorePage> {
       child: ListTile(
         leading: const Icon(Icons.smartphone, size: 20),
         title: Text(title.isEmpty ? id : title, style: const TextStyle(fontSize: 14)),
-        subtitle: Text(sub, style: const TextStyle(fontSize: 12, color: AidockColors.textDim)),
+        subtitle: Text(sub, style:  TextStyle(fontSize: 12, color: AidockColors.textDim)),
         trailing: TextButton(
           onPressed: id.isEmpty
               ? null
@@ -279,7 +280,7 @@ class _MorePageState extends State<MorePage> {
     final kind = '${r['kind'] ?? ''}';
     final color = status == 'active'
         ? AidockColors.accent
-        : (status == 'paused' ? const Color(0xFFE0B34D) : AidockColors.textDim);
+        : (status == 'paused' ? AidockColors.warn : AidockColors.textDim);
     final paused = status == 'paused';
     return Card(
       color: AidockColors.surface,
@@ -339,7 +340,7 @@ class _MorePageState extends State<MorePage> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.nightlight_round, size: 18, color: AidockColors.textDim),
+           Icon(Icons.nightlight_round, size: 18, color: AidockColors.textDim),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -349,7 +350,7 @@ class _MorePageState extends State<MorePage> {
                 const SizedBox(height: 2),
                 Text(
                   on ? '这段时间只推送审批和提问 · $range' : '关着：任何提醒都会响',
-                  style: const TextStyle(fontSize: 11.5, color: AidockColors.textDim),
+                  style:  TextStyle(fontSize: 11.5, color: AidockColors.textDim),
                 ),
               ],
             ),
@@ -379,7 +380,7 @@ class _MorePageState extends State<MorePage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('填 0–23 的整点，跨夜也行（23 到 8 表示晚上 11 点到早上 8 点）。',
+             Text('填 0–23 的整点，跨夜也行（23 到 8 表示晚上 11 点到早上 8 点）。',
                 style: TextStyle(fontSize: 12.5, height: 1.5, color: AidockColors.textDim)),
             const SizedBox(height: 12),
             Row(
@@ -410,6 +411,26 @@ class _MorePageState extends State<MorePage> {
     endCtl.dispose();
   }
 
+  Widget _themeTile(AppState s) {
+    return Card(
+      color: AidockColors.surface,
+      child: SwitchListTile(
+        value: s.lightMode,
+        onChanged: (v) => s.setLightMode(v),
+        title: Text('浅色模式', style: TextStyle(fontSize: 14, color: AidockColors.text)),
+        subtitle: Text(
+          s.lightMode ? '白底深字，白天在户外看得清' : '深色底，夜里不刺眼',
+          style: TextStyle(fontSize: 11, color: AidockColors.textDim),
+        ),
+        secondary: Icon(
+          s.lightMode ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+          size: 20,
+          color: AidockColors.textDim,
+        ),
+      ),
+    );
+  }
+
   Widget _textScaleTile(AppState s) {
     return Card(
       color: AidockColors.surface,
@@ -423,7 +444,7 @@ class _MorePageState extends State<MorePage> {
                 const Text('字号', style: TextStyle(fontSize: 14)),
                 const Spacer(),
                 Text('${(s.textScale * 100).round()}%',
-                    style: const TextStyle(fontSize: 12, color: AidockColors.textDim)),
+                    style:  TextStyle(fontSize: 12, color: AidockColors.textDim)),
               ],
             ),
             Slider(

@@ -88,7 +88,7 @@ class _PluginsPageState extends State<PluginsPage> with SingleTickerProviderStat
             Expanded(
               child: Text(
                 text,
-                style: const TextStyle(fontSize: 13, height: 1.5, color: AidockColors.text),
+                style:  TextStyle(fontSize: 13, height: 1.5, color: AidockColors.text),
               ),
             ),
           ],
@@ -112,16 +112,16 @@ class _PluginsPageState extends State<PluginsPage> with SingleTickerProviderStat
         actionsPadding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
         title: Text(
           title,
-          style: const TextStyle(fontSize: 16, height: 1.4, fontWeight: FontWeight.w600, color: AidockColors.text),
+          style:  TextStyle(fontSize: 16, height: 1.4, fontWeight: FontWeight.w600, color: AidockColors.text),
         ),
         content: Text(
           message,
-          style: const TextStyle(fontSize: 13, height: 1.6, color: AidockColors.textDim),
+          style:  TextStyle(fontSize: 13, height: 1.6, color: AidockColors.textDim),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消', style: TextStyle(fontSize: 14, color: AidockColors.textDim)),
+            child:  Text('取消', style: TextStyle(fontSize: 14, color: AidockColors.textDim)),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -247,12 +247,12 @@ class _PluginsPageState extends State<PluginsPage> with SingleTickerProviderStat
               tooltip: '刷新',
               onPressed: _controller.installedLoading || _controller.marketLoading ? null : _refresh,
               icon: _controller.installedLoading || _controller.marketLoading
-                  ? const SizedBox(
+                  ?  SizedBox(
                       width: 17,
                       height: 17,
                       child: CircularProgressIndicator(strokeWidth: 2, color: AidockColors.textDim),
                     )
-                  : const Icon(Icons.refresh_rounded, size: 21, color: AidockColors.text),
+                  :  Icon(Icons.refresh_rounded, size: 21, color: AidockColors.text),
             ),
           ],
           bottom: TabBar(
@@ -291,7 +291,7 @@ class _PluginsPageState extends State<PluginsPage> with SingleTickerProviderStat
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
-      decoration: const BoxDecoration(
+      decoration:  BoxDecoration(
         color: AidockColors.surface,
         border: Border(bottom: BorderSide(color: AidockColors.line, width: 1)),
       ),
@@ -300,14 +300,14 @@ class _PluginsPageState extends State<PluginsPage> with SingleTickerProviderStat
         children: [
           Row(
             children: [
-              const Icon(Icons.sync_rounded, size: 16, color: AidockColors.accent),
+               Icon(Icons.sync_rounded, size: 16, color: AidockColors.accent),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   '正在$kind ${_controller.operationTarget}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style:  TextStyle(
                     fontSize: 13,
                     height: 1.4,
                     fontWeight: FontWeight.w500,
@@ -329,7 +329,7 @@ class _PluginsPageState extends State<PluginsPage> with SingleTickerProviderStat
           const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(3),
-            child: const LinearProgressIndicator(
+            child:  LinearProgressIndicator(
               minHeight: 3,
               backgroundColor: AidockColors.line,
               valueColor: AlwaysStoppedAnimation<Color>(AidockColors.accent),
@@ -338,7 +338,7 @@ class _PluginsPageState extends State<PluginsPage> with SingleTickerProviderStat
           const SizedBox(height: 6),
           Text(
             detail,
-            style: const TextStyle(fontSize: 11.5, height: 1.4, color: AidockColors.textDim),
+            style:  TextStyle(fontSize: 11.5, height: 1.4, color: AidockColors.textDim),
           ),
         ],
       ),
@@ -393,10 +393,10 @@ class _PluginsPageState extends State<PluginsPage> with SingleTickerProviderStat
         children: [
           Text(
             '共 $count 个插件',
-            style: const TextStyle(fontSize: 12, height: 1.4, color: AidockColors.textDim),
+            style:  TextStyle(fontSize: 12, height: 1.4, color: AidockColors.textDim),
           ),
           const Spacer(),
-          const Text(
+           Text(
             '长按可卸载',
             style: TextStyle(fontSize: 12, height: 1.4, color: AidockColors.textDim),
           ),
@@ -433,7 +433,7 @@ class _PluginsPageState extends State<PluginsPage> with SingleTickerProviderStat
                       plugin.moduleName,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style:  TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 13,
                         height: 1.45,
@@ -458,7 +458,7 @@ class _PluginsPageState extends State<PluginsPage> with SingleTickerProviderStat
                         ),
                         if (isSelf) ...[
                           const SizedBox(width: 6),
-                          const _Badge(label: '连接插件', color: AidockColors.accent),
+                           _Badge(label: '连接插件', color: AidockColors.accent),
                         ],
                       ],
                     ),
@@ -466,7 +466,7 @@ class _PluginsPageState extends State<PluginsPage> with SingleTickerProviderStat
                 ),
               ),
               if (busy)
-                const Padding(
+                 Padding(
                   padding: EdgeInsets.only(right: 4),
                   child: SizedBox(
                     width: 14,
@@ -502,17 +502,17 @@ class _PluginsPageState extends State<PluginsPage> with SingleTickerProviderStat
             controller: _search,
             onChanged: (_) => setState(() {}),
             textInputAction: TextInputAction.search,
-            style: const TextStyle(fontSize: 14, height: 1.4, color: AidockColors.text),
+            style:  TextStyle(fontSize: 14, height: 1.4, color: AidockColors.text),
             cursorColor: AidockColors.accent,
             decoration: InputDecoration(
               hintText: '搜索插件名或说明',
-              hintStyle: const TextStyle(fontSize: 14, color: AidockColors.textDim),
-              prefixIcon: const Icon(Icons.search_rounded, size: 19, color: AidockColors.textDim),
+              hintStyle:  TextStyle(fontSize: 14, color: AidockColors.textDim),
+              prefixIcon:  Icon(Icons.search_rounded, size: 19, color: AidockColors.textDim),
               suffixIcon: hasQuery
                   ? IconButton(
                       tooltip: '清除搜索',
                       onPressed: () => setState(_search.clear),
-                      icon: const Icon(Icons.close_rounded, size: 17, color: AidockColors.textDim),
+                      icon:  Icon(Icons.close_rounded, size: 17, color: AidockColors.textDim),
                     )
                   : null,
               isDense: true,
@@ -576,12 +576,12 @@ class _PluginsPageState extends State<PluginsPage> with SingleTickerProviderStat
   Widget _marketTile(MarketBundle bundle) {
     final badges = <Widget>[
       if (bundle.installed)
-        const _Badge(label: '已装', color: AidockColors.ok, icon: Icons.check_rounded)
+         _Badge(label: '已装', color: AidockColors.ok, icon: Icons.check_rounded)
       else
-        const _Badge(label: '未装', color: AidockColors.textDim),
-      if (bundle.official) const _Badge(label: '官方', color: AidockColors.warn),
+         _Badge(label: '未装', color: AidockColors.textDim),
+      if (bundle.official)  _Badge(label: '官方', color: AidockColors.warn),
       if (bundle.update != null) _Badge(label: '可更新 ${bundle.update}', color: AidockColors.accent),
-      if (bundle.errorMessage != null) const _Badge(label: '不可用', color: AidockColors.danger),
+      if (bundle.errorMessage != null)  _Badge(label: '不可用', color: AidockColors.danger),
     ];
     return Material(
       color: AidockColors.surface,
@@ -612,7 +612,7 @@ class _PluginsPageState extends State<PluginsPage> with SingleTickerProviderStat
                             bundle.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style:  TextStyle(
                               fontSize: 14,
                               height: 1.45,
                               fontWeight: FontWeight.w600,
@@ -624,7 +624,7 @@ class _PluginsPageState extends State<PluginsPage> with SingleTickerProviderStat
                           const SizedBox(width: 6),
                           Text(
                             bundle.version!,
-                            style: const TextStyle(
+                            style:  TextStyle(
                               fontFamily: 'monospace',
                               fontSize: 11,
                               height: 1.6,
@@ -639,7 +639,7 @@ class _PluginsPageState extends State<PluginsPage> with SingleTickerProviderStat
                       bundle.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style:  TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 11.5,
                         height: 1.35,
@@ -652,7 +652,7 @@ class _PluginsPageState extends State<PluginsPage> with SingleTickerProviderStat
                         bundle.description,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style:  TextStyle(
                           fontSize: 12,
                           height: 1.5,
                           color: AidockColors.textDim,
@@ -666,7 +666,7 @@ class _PluginsPageState extends State<PluginsPage> with SingleTickerProviderStat
                   ],
                 ),
               ),
-              const Padding(
+               Padding(
                 padding: EdgeInsets.only(left: 2, top: 2),
                 child: Icon(Icons.chevron_right_rounded, size: 18, color: AidockColors.textDim),
               ),
@@ -689,13 +689,13 @@ class _PluginsPageState extends State<PluginsPage> with SingleTickerProviderStat
         border: Border.all(color: AidockColors.line),
       ),
       child: bytes == null
-          ? const Icon(Icons.extension_outlined, size: 19, color: AidockColors.textDim)
+          ?  Icon(Icons.extension_outlined, size: 19, color: AidockColors.textDim)
           : Image.memory(
               bytes,
               fit: BoxFit.cover,
               gaplessPlayback: true,
               errorBuilder: (_, __, ___) =>
-                  const Icon(Icons.extension_outlined, size: 19, color: AidockColors.textDim),
+                   Icon(Icons.extension_outlined, size: 19, color: AidockColors.textDim),
             ),
     );
   }
@@ -730,7 +730,7 @@ class _DetailSheetState extends State<_DetailSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration:  BoxDecoration(
         color: AidockColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
         border: Border(top: BorderSide(color: AidockColors.line, width: 1)),
@@ -754,7 +754,7 @@ class _DetailSheetState extends State<_DetailSheet> {
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
                 child: _header(bundle),
               ),
-              const Divider(height: 1, thickness: 1, color: AidockColors.line),
+               Divider(height: 1, thickness: 1, color: AidockColors.line),
               Expanded(child: _detailBody()),
               _footer(bundle),
             ],
@@ -780,7 +780,7 @@ class _DetailSheetState extends State<_DetailSheet> {
                 bundle?.title ?? widget.name,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style:  TextStyle(
                   fontSize: 16,
                   height: 1.4,
                   fontWeight: FontWeight.w600,
@@ -792,7 +792,7 @@ class _DetailSheetState extends State<_DetailSheet> {
                 widget.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style:  TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 11.5,
                   height: 1.35,
@@ -807,14 +807,14 @@ class _DetailSheetState extends State<_DetailSheet> {
                   if (bundle?.version != null)
                     _Badge(label: bundle!.version!, color: AidockColors.textDim),
                   if (bundle?.installed == true)
-                    const _Badge(label: '已装', color: AidockColors.ok, icon: Icons.check_rounded)
+                     _Badge(label: '已装', color: AidockColors.ok, icon: Icons.check_rounded)
                   else
-                    const _Badge(label: '未装', color: AidockColors.textDim),
-                  if (bundle?.official == true) const _Badge(label: '官方', color: AidockColors.warn),
+                     _Badge(label: '未装', color: AidockColors.textDim),
+                  if (bundle?.official == true)  _Badge(label: '官方', color: AidockColors.warn),
                   if (bundle?.update != null)
                     _Badge(label: '可更新 ${bundle!.update}', color: AidockColors.accent),
                   if (bundle?.protectedSelf == true)
-                    const _Badge(label: '连接插件', color: AidockColors.accent),
+                     _Badge(label: '连接插件', color: AidockColors.accent),
                 ],
               ),
             ],
@@ -829,7 +829,7 @@ class _DetailSheetState extends State<_DetailSheet> {
       future: _future,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
+          return  Center(
             child: SizedBox(
               width: 20,
               height: 20,
@@ -852,7 +852,7 @@ class _DetailSheetState extends State<_DetailSheet> {
               child: Text(
                 detail.status == 'none' ? '这个插件没有附说明文档' : '说明文档是空的',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 13, height: 1.6, color: AidockColors.textDim),
+                style:  TextStyle(fontSize: 13, height: 1.6, color: AidockColors.textDim),
               ),
             ),
           );
@@ -885,7 +885,7 @@ class _DetailSheetState extends State<_DetailSheet> {
                     bundle!.errorMessage!,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, height: 1.45, color: AidockColors.danger),
+                    style:  TextStyle(fontSize: 12, height: 1.45, color: AidockColors.danger),
                   ),
                 ),
               )
@@ -927,7 +927,7 @@ class _DetailSheetState extends State<_DetailSheet> {
         continue;
       }
       if (trimmed == '---' || trimmed == '***' || trimmed == '___') {
-        blocks.add(const Padding(
+        blocks.add( Padding(
           padding: EdgeInsets.symmetric(vertical: 8),
           child: Divider(height: 1, thickness: 1, color: AidockColors.line),
         ));
@@ -1002,13 +1002,13 @@ class _SheetIcon extends StatelessWidget {
         border: Border.all(color: AidockColors.line),
       ),
       child: bytes == null
-          ? const Icon(Icons.extension_outlined, size: 21, color: AidockColors.textDim)
+          ?  Icon(Icons.extension_outlined, size: 21, color: AidockColors.textDim)
           : Image.memory(
               bytes,
               fit: BoxFit.cover,
               gaplessPlayback: true,
               errorBuilder: (_, __, ___) =>
-                  const Icon(Icons.extension_outlined, size: 21, color: AidockColors.textDim),
+                   Icon(Icons.extension_outlined, size: 21, color: AidockColors.textDim),
             ),
     );
   }
@@ -1072,7 +1072,7 @@ class _InstallDialogState extends State<_InstallDialog> {
       actionsPadding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
       title: Text(
         '安装 ${widget.name}',
-        style: const TextStyle(fontSize: 16, height: 1.4, fontWeight: FontWeight.w600, color: AidockColors.text),
+        style:  TextStyle(fontSize: 16, height: 1.4, fontWeight: FontWeight.w600, color: AidockColors.text),
       ),
       content: SizedBox(
         width: 320,
@@ -1080,7 +1080,7 @@ class _InstallDialogState extends State<_InstallDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+             Text(
               '版本',
               style: TextStyle(fontSize: 12, height: 1.4, color: AidockColors.textDim),
             ),
@@ -1111,7 +1111,7 @@ class _InstallDialogState extends State<_InstallDialog> {
             const SizedBox(height: 8),
             _versionHint(versions),
             const SizedBox(height: 14),
-            const Text(
+             Text(
               'npm 源',
               style: TextStyle(fontSize: 12, height: 1.4, color: AidockColors.textDim),
             ),
@@ -1139,7 +1139,7 @@ class _InstallDialogState extends State<_InstallDialog> {
             const SizedBox(height: 8),
             Text(
               '装完由宿主重新加载，这台手机上立刻能看到变化。',
-              style: const TextStyle(fontSize: 11.5, height: 1.5, color: AidockColors.textDim),
+              style:  TextStyle(fontSize: 11.5, height: 1.5, color: AidockColors.textDim),
             ),
           ],
         ),
@@ -1147,14 +1147,14 @@ class _InstallDialogState extends State<_InstallDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消', style: TextStyle(fontSize: 14, color: AidockColors.textDim)),
+          child:  Text('取消', style: TextStyle(fontSize: 14, color: AidockColors.textDim)),
         ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(<String, String?>{
             'version': currentVersion.isEmpty ? null : currentVersion,
             'registry': _registry.isEmpty ? null : _registry,
           }),
-          child: const Text(
+          child:  Text(
             '下一步',
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AidockColors.accent),
           ),
@@ -1165,7 +1165,7 @@ class _InstallDialogState extends State<_InstallDialog> {
 
   Widget _versionHint(PluginVersions? versions) {
     if (_loading) {
-      return const Row(
+      return  Row(
         children: [
           SizedBox(width: 11, height: 11, child: CircularProgressIndicator(strokeWidth: 2, color: AidockColors.textDim)),
           SizedBox(width: 6),
@@ -1174,7 +1174,7 @@ class _InstallDialogState extends State<_InstallDialog> {
       );
     }
     if (versions == null) {
-      return const Text(
+      return  Text(
         '没查到版本，按最新版本装',
         style: TextStyle(fontSize: 11.5, height: 1.4, color: AidockColors.textDim),
       );
@@ -1183,18 +1183,18 @@ class _InstallDialogState extends State<_InstallDialog> {
       final detail = versions.error ?? versions.problemText;
       return Text(
         detail.isEmpty ? '这个源上没列出这个插件' : '这个源拒绝了：$detail',
-        style: const TextStyle(fontSize: 11.5, height: 1.5, color: AidockColors.warn),
+        style:  TextStyle(fontSize: 11.5, height: 1.5, color: AidockColors.warn),
       );
     }
     if (versions.versions.isEmpty) {
-      return const Text(
+      return  Text(
         '这个源上没有可选版本，按最新版本装',
         style: TextStyle(fontSize: 11.5, height: 1.4, color: AidockColors.textDim),
       );
     }
     return Text(
       '共 ${versions.versions.length} 个版本，默认最新',
-      style: const TextStyle(fontSize: 11.5, height: 1.4, color: AidockColors.textDim),
+      style:  TextStyle(fontSize: 11.5, height: 1.4, color: AidockColors.textDim),
     );
   }
 
@@ -1215,8 +1215,8 @@ class _InstallDialogState extends State<_InstallDialog> {
           value: value,
           isExpanded: true,
           dropdownColor: AidockColors.surfaceAlt,
-          icon: const Icon(Icons.expand_more_rounded, size: 18, color: AidockColors.textDim),
-          style: const TextStyle(fontSize: 13, height: 1.4, color: AidockColors.text),
+          icon:  Icon(Icons.expand_more_rounded, size: 18, color: AidockColors.textDim),
+          style:  TextStyle(fontSize: 13, height: 1.4, color: AidockColors.text),
           onChanged: onChanged == null
               ? null
               : (next) {
@@ -1229,7 +1229,7 @@ class _InstallDialogState extends State<_InstallDialog> {
                       item.value,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13, height: 1.4, color: AidockColors.text),
+                      style:  TextStyle(fontSize: 13, height: 1.4, color: AidockColors.text),
                     ),
                   ))
               .toList(),
@@ -1308,7 +1308,7 @@ class _LoadingBlock extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(
+           SizedBox(
             width: 22,
             height: 22,
             child: CircularProgressIndicator(strokeWidth: 2, color: AidockColors.accent),
@@ -1316,7 +1316,7 @@ class _LoadingBlock extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             label,
-            style: const TextStyle(fontSize: 12.5, height: 1.4, color: AidockColors.textDim),
+            style:  TextStyle(fontSize: 12.5, height: 1.4, color: AidockColors.textDim),
           ),
         ],
       ),
@@ -1347,7 +1347,7 @@ class _ErrorBlock extends StatelessWidget {
           child: Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13, height: 1.6, color: AidockColors.textDim),
+            style:  TextStyle(fontSize: 13, height: 1.6, color: AidockColors.textDim),
           ),
         ),
         const SizedBox(height: 10),
@@ -1388,7 +1388,7 @@ class _EmptyBlock extends StatelessWidget {
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style:  TextStyle(
                 fontSize: 14.5,
                 height: 1.45,
                 fontWeight: FontWeight.w600,
@@ -1399,7 +1399,7 @@ class _EmptyBlock extends StatelessWidget {
             Text(
               hint,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12.5, height: 1.6, color: AidockColors.textDim),
+              style:  TextStyle(fontSize: 12.5, height: 1.6, color: AidockColors.textDim),
             ),
             if (action != null) ...[
               const SizedBox(height: 6),

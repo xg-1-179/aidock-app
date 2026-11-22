@@ -107,7 +107,7 @@ class _ChatPageState extends State<ChatPage> {
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
                         child: Text(
                           '${g['name'] ?? g['id']}',
-                          style: const TextStyle(
+                          style:  TextStyle(
                               fontSize: 11, color: AidockColors.textDim, letterSpacing: .5),
                         ),
                       ),
@@ -129,7 +129,7 @@ class _ChatPageState extends State<ChatPage> {
                                 ),
                           trailing: ('${g['id']}' == curProvider &&
                                   '${m['id']}' == curModel)
-                              ? const Icon(Icons.check, size: 18, color: AidockColors.accent)
+                              ?  Icon(Icons.check, size: 18, color: AidockColors.accent)
                               : null,
                           onTap: () async {
                             Navigator.of(ctx).pop();
@@ -209,7 +209,7 @@ class _ChatPageState extends State<ChatPage> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: Row(
         children: [
-          const SizedBox(
+           SizedBox(
             width: 12,
             height: 12,
             child: CircularProgressIndicator(strokeWidth: 1.6, color: AidockColors.warn),
@@ -258,17 +258,17 @@ class _ChatPageState extends State<ChatPage> {
           ),
           TextButton.icon(
             onPressed: s.openSessionId == null ? null : _pickModel,
-            icon: const Icon(Icons.memory, size: 17, color: AidockColors.textDim),
+            icon:  Icon(Icons.memory, size: 17, color: AidockColors.textDim),
             label: Text(
               s.modelLabel,
-              style: const TextStyle(fontSize: 12, color: AidockColors.textDim),
+              style:  TextStyle(fontSize: 12, color: AidockColors.textDim),
             ),
           ),
           if (s.streamingNow)
             TextButton.icon(
               onPressed: s.stopTurn,
-              icon: const Icon(Icons.stop_circle_outlined, size: 18, color: AidockColors.warn),
-              label: const Text('停止', style: TextStyle(color: AidockColors.warn, fontSize: 13)),
+              icon:  Icon(Icons.stop_circle_outlined, size: 18, color: AidockColors.warn),
+              label:  Text('停止', style: TextStyle(color: AidockColors.warn, fontSize: 13)),
             ),
         ],
       ),
@@ -282,7 +282,7 @@ class _ChatPageState extends State<ChatPage> {
                 WidgetsBinding.instance.addPostFrameCallback((_) => _toBottom());
                 final cards = s.approvals;
                 if (s.messages.isEmpty && cards.isEmpty && s.questions.isEmpty) {
-                  return const Center(
+                  return  Center(
                     child: Text('说点什么…', style: TextStyle(color: AidockColors.textDim, fontSize: 13)),
                   );
                 }
@@ -302,7 +302,7 @@ class _ChatPageState extends State<ChatPage> {
             top: false,
             child: Container(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-              decoration: const BoxDecoration(
+              decoration:  BoxDecoration(
                 color: AidockColors.bg,
                 border: Border(top: BorderSide(color: AidockColors.line)),
               ),
@@ -350,7 +350,7 @@ class _ChatPageState extends State<ChatPage> {
                       style: FilledButton.styleFrom(
                         padding: EdgeInsets.zero,
                         backgroundColor: AidockColors.accent,
-                        foregroundColor: const Color(0xFF06121F),
+                        foregroundColor: AidockColors.onAccent,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
                       ),
                       child: const Icon(Icons.arrow_upward_rounded, size: 20),
@@ -411,13 +411,13 @@ class _ChatPageState extends State<ChatPage> {
                 ),
               ));
             },
-            child: const Padding(
+            child:  Padding(
               padding: EdgeInsets.symmetric(vertical: 9),
               child: Text('全部命令…',
                   style: TextStyle(fontSize: 12, color: AidockColors.textDim)),
             ),
           ),
-          const Divider(height: 1, color: AidockColors.line),
+           Divider(height: 1, color: AidockColors.line),
           for (final c in _slash)
             InkWell(
               onTap: () {
@@ -430,7 +430,7 @@ class _ChatPageState extends State<ChatPage> {
                 child: Row(
                   children: [
                     Text('/${c['name']}',
-                        style: const TextStyle(
+                        style:  TextStyle(
                             fontSize: 13,
                             fontFamily: 'monospace',
                             color: AidockColors.accent)),
@@ -440,12 +440,12 @@ class _ChatPageState extends State<ChatPage> {
                         '${c['description'] ?? ''}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11.5, color: AidockColors.textDim),
+                        style:  TextStyle(fontSize: 11.5, color: AidockColors.textDim),
                       ),
                     ),
                     if (c['input'] is Map && '${(c['input'] as Map)['hint'] ?? ''}'.isNotEmpty)
                       Text('${(c['input'] as Map)['hint']}',
-                          style: const TextStyle(fontSize: 10.5, color: AidockColors.textDim)),
+                          style:  TextStyle(fontSize: 10.5, color: AidockColors.textDim)),
                   ],
                 ),
               ),
@@ -471,11 +471,11 @@ class _ChatPageState extends State<ChatPage> {
         children: [
           Row(
             children: [
-              const Icon(Icons.shield_outlined, size: 16, color: AidockColors.warn),
+               Icon(Icons.shield_outlined, size: 16, color: AidockColors.warn),
               const SizedBox(width: 7),
               Expanded(
                 child: Text(card.headline,
-                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AidockColors.text)),
+                    style:  TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AidockColors.text)),
               ),
             ],
           ),
@@ -483,7 +483,7 @@ class _ChatPageState extends State<ChatPage> {
             Padding(
               padding: const EdgeInsets.only(top: 7),
               child: Text(card.fact,
-                  style: const TextStyle(fontSize: 12.5, height: 1.5, color: AidockColors.textDim)),
+                  style:  TextStyle(fontSize: 12.5, height: 1.5, color: AidockColors.textDim)),
             ),
           if (card.command.isNotEmpty)
             Padding(
@@ -497,7 +497,7 @@ class _ChatPageState extends State<ChatPage> {
                   border: Border.all(color: AidockColors.line),
                 ),
                 child: Text(card.command,
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 11.5, height: 1.45, color: AidockColors.text)),
+                    style:  TextStyle(fontFamily: 'monospace', fontSize: 11.5, height: 1.45, color: AidockColors.text)),
               ),
             ),
           Padding(
@@ -510,7 +510,7 @@ class _ChatPageState extends State<ChatPage> {
                   onPressed: () => s.respond(card, 'allowed-once'),
                   style: FilledButton.styleFrom(
                     backgroundColor: AidockColors.accent,
-                    foregroundColor: const Color(0xFF06121F),
+                    foregroundColor: AidockColors.onAccent,
                     visualDensity: VisualDensity.compact,
                   ),
                   child: const Text('允许一次', style: TextStyle(fontSize: 13)),
@@ -519,7 +519,7 @@ class _ChatPageState extends State<ChatPage> {
                   onPressed: () => s.respond(card, 'denied'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AidockColors.warn,
-                    side: const BorderSide(color: AidockColors.line),
+                    side:  BorderSide(color: AidockColors.line),
                     visualDensity: VisualDensity.compact,
                   ),
                   child: const Text('拒绝', style: TextStyle(fontSize: 13)),
@@ -528,7 +528,7 @@ class _ChatPageState extends State<ChatPage> {
                   TextButton(
                     onPressed: () => s.respond(card, 'allowed-class'),
                     child: Text(card.classLabel.isEmpty ? '这一类以后都同意' : '以后都同意：${card.classLabel}',
-                        style: const TextStyle(fontSize: 12.5, color: AidockColors.textDim)),
+                        style:  TextStyle(fontSize: 12.5, color: AidockColors.textDim)),
                   ),
               ],
             ),
@@ -544,7 +544,7 @@ class _ChatPageState extends State<ChatPage> {
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Center(
           child: Text(m.text,
-              style: const TextStyle(fontSize: 11.5, color: AidockColors.textDim)),
+              style:  TextStyle(fontSize: 11.5, color: AidockColors.textDim)),
         ),
       );
     }
@@ -767,7 +767,7 @@ class _QuestionDockState extends State<_QuestionDock> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+           Row(
             children: [
               Icon(Icons.help_outline, size: 16, color: AidockColors.accent),
               SizedBox(width: 7),
@@ -789,14 +789,14 @@ class _QuestionDockState extends State<_QuestionDock> {
                   onPressed: _sending ? null : _submit,
                   style: FilledButton.styleFrom(
                     backgroundColor: AidockColors.accent,
-                    foregroundColor: const Color(0xFF06121F),
+                    foregroundColor: AidockColors.onAccent,
                     visualDensity: VisualDensity.compact,
                   ),
                   child: Text(_sending ? '提交中…' : '提交回答', style: const TextStyle(fontSize: 13)),
                 ),
                 if (_QuestionDockState.q_tip(card).isNotEmpty)
                   Text(_QuestionDockState.q_tip(card),
-                      style: const TextStyle(fontSize: 11.5, color: AidockColors.textDim)),
+                      style:  TextStyle(fontSize: 11.5, color: AidockColors.textDim)),
               ],
             ),
           ),
@@ -817,15 +817,15 @@ class _QuestionDockState extends State<_QuestionDock> {
         children: [
           if ((q.header ?? '').isNotEmpty)
             Text(q.header!,
-                style: const TextStyle(fontSize: 11.5, color: AidockColors.textDim, letterSpacing: 0.4)),
+                style:  TextStyle(fontSize: 11.5, color: AidockColors.textDim, letterSpacing: 0.4)),
           if ((q.header ?? '').isNotEmpty) const SizedBox(height: 3),
           Text(q.text,
-              style: const TextStyle(fontSize: 13, height: 1.5, color: AidockColors.text)),
+              style:  TextStyle(fontSize: 13, height: 1.5, color: AidockColors.text)),
           if ((q.detail ?? '').isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 5),
               child: Text(q.detail!,
-                  style: const TextStyle(fontSize: 12, height: 1.5, color: AidockColors.textDim)),
+                  style:  TextStyle(fontSize: 12, height: 1.5, color: AidockColors.textDim)),
             ),
           if (q.options.isNotEmpty)
             Padding(
@@ -841,7 +841,7 @@ class _QuestionDockState extends State<_QuestionDock> {
                       onSelected: (_) => _toggle(q, o.label),
                       backgroundColor: AidockColors.bg,
                       selectedColor: AidockColors.accent.withOpacity(0.22),
-                      labelStyle: const TextStyle(color: AidockColors.text),
+                      labelStyle:  TextStyle(color: AidockColors.text),
                       side: BorderSide(
                           color: picks.contains(o.label) ? AidockColors.accent : AidockColors.line),
                       visualDensity: VisualDensity.compact,
@@ -856,7 +856,7 @@ class _QuestionDockState extends State<_QuestionDock> {
               controller: _customOf(q.id),
               minLines: 1,
               maxLines: 3,
-              style: const TextStyle(fontSize: 13, color: AidockColors.text),
+              style:  TextStyle(fontSize: 13, color: AidockColors.text),
               decoration: InputDecoration(
                 hintText: q.options.isEmpty ? '在这里回答…' : '或者自己写一个答案（可选）',
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

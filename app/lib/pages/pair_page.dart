@@ -67,7 +67,7 @@ class _PairPageState extends State<PairPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+           Row(
             children: [
               Icon(Icons.history_rounded, size: 18, color: AidockColors.accent),
               SizedBox(width: 8),
@@ -92,11 +92,11 @@ class _PairPageState extends State<PairPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SelectableText(m.host,
-              style: const TextStyle(
+              style:  TextStyle(
                   fontSize: 12, color: AidockColors.textDim, fontFamily: 'monospace')),
           if (when.isNotEmpty)
             Text('上次连接 $when',
-                style: const TextStyle(fontSize: 10.5, color: AidockColors.textDim)),
+                style:  TextStyle(fontSize: 10.5, color: AidockColors.textDim)),
           const SizedBox(height: 6),
           Row(
             children: [
@@ -159,10 +159,10 @@ class _PairPageState extends State<PairPage> {
                       borderRadius: BorderRadius.circular(13),
                       border: Border.all(color: AidockColors.accent.withOpacity(0.45)),
                     ),
-                    child: const Icon(Icons.dock_rounded, color: AidockColors.accent, size: 24),
+                    child:  Icon(Icons.dock_rounded, color: AidockColors.accent, size: 24),
                   ),
                   const SizedBox(width: 12),
-                  const Column(
+                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('AIDock',
@@ -181,10 +181,10 @@ class _PairPageState extends State<PairPage> {
               const Text('连接这台电脑',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               const SizedBox(height: 6),
-              const Text('在电脑上打开插件面板，会显示一个 6 位连接码（10 分钟一换）。',
+               Text('在电脑上打开插件面板，会显示一个 6 位连接码（10 分钟一换）。',
                   style: TextStyle(fontSize: 13, color: AidockColors.textDim, height: 1.5)),
               const SizedBox(height: 6),
-              const SelectableText('电脑上打开：http://127.0.0.1:3080/api/mobile/v1/link/panel',
+               SelectableText('电脑上打开：http://127.0.0.1:3080/api/mobile/v1/link/panel',
                   style: TextStyle(fontSize: 11.5, color: AidockColors.textDim, height: 1.5,
                       fontFamily: 'monospace')),
               const SizedBox(height: 14),
@@ -244,11 +244,11 @@ class _PairPageState extends State<PairPage> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.error_outline, size: 18, color: AidockColors.danger),
+                       Icon(Icons.error_outline, size: 18, color: AidockColors.danger),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(s.error!,
-                            style: const TextStyle(fontSize: 13, color: AidockColors.danger, height: 1.45)),
+                            style:  TextStyle(fontSize: 13, color: AidockColors.danger, height: 1.45)),
                       ),
                     ],
                   ),
@@ -273,7 +273,7 @@ class _PairPageState extends State<PairPage> {
                         Padding(
                           padding: const EdgeInsets.only(top: 3),
                           child: Text(line,
-                              style: const TextStyle(
+                              style:  TextStyle(
                                   fontSize: 11.5, color: AidockColors.textDim, height: 1.4)),
                         ),
                     ],
@@ -288,15 +288,15 @@ class _PairPageState extends State<PairPage> {
                   onPressed: s.busy ? null : _submit,
                   style: FilledButton.styleFrom(
                     backgroundColor: AidockColors.accent,
-                    foregroundColor: const Color(0xFF06121F),
+                    foregroundColor: AidockColors.onAccent,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     textStyle: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600),
                   ),
                   child: s.busy
-                      ? const SizedBox(
+                      ?  SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2.2, color: Color(0xFF06121F)),
+                          child: CircularProgressIndicator(strokeWidth: 2.2, color: AidockColors.onAccent),
                         )
                       : const Text('连接'),
                 ),
@@ -309,7 +309,7 @@ class _PairPageState extends State<PairPage> {
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: AidockColors.line),
                 ),
-                child: const Column(
+                child:  Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('连不上时',
@@ -331,5 +331,5 @@ class _PairPageState extends State<PairPage> {
   }
 
   Widget _label(String text) => Text(text,
-      style: const TextStyle(fontSize: 12.5, color: AidockColors.textDim, letterSpacing: 0.3));
+      style:  TextStyle(fontSize: 12.5, color: AidockColors.textDim, letterSpacing: 0.3));
 }

@@ -83,32 +83,38 @@ class _AidockAppState extends State<AidockApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'AIDock',
-      debugShowCheckedModeBanner: false,
-      theme: buildTheme(),
-      builder: (context, child) => MediaQuery.withClampedTextScaling(
-        maxScaleFactor: 2.0,
-        child: MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(state.textScale),
+    // 整棵树套在 AnimatedBuilder 里：切深色/浅色时换的是全局配色表 + ThemeData，
+    // 必须从 MaterialApp 这一层重建，否则弹出的底部面板、SnackBar 还拿旧主题。
+    return AnimatedBuilder(
+      animation: state,
+      builder: (context, _) {
+        AidockColors.apply(state.lightMode);
+        return MaterialApp(
+          title: 'AIDock',
+          debugShowCheckedModeBanner: false,
+          theme: buildTheme(light: state.lightMode),
+          builder: (context, child) => MediaQuery.withClampedTextScaling(
+            maxScaleFactor: 2.0,
+            child: MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: TextScaler.linear(state.textScale),
+              ),
+              child: child!,
+            ),
           ),
-          child: child!,
-        ),
-      ),
-      home: _showIntro == null
-          ? const Scaffold(body: Center(child: CircularProgressIndicator()))
-          : _showIntro!
-              ? IntroPage(onDone: () async {
-                  final p = await SharedPreferences.getInstance();
-                  await p.setBool(_kIntroSeen, true);
-                  if (mounted) setState(() => _showIntro = false);
-                })
-              : AnimatedBuilder(
-                  animation: state,
-                  builder: (context, _) =>
-                      state.paired ? SessionsPage(state: state) : PairPage(state: state),
-                ),
+          home: _showIntro == null
+              ? Scaffold(body: Center(child: CircularProgressIndicator()))
+              : _showIntro!
+                  ? IntroPage(onDone: () async {
+                      final p = await SharedPreferences.getInstance();
+                      await p.setBool(_kIntroSeen, true);
+                      if (mounted) setState(() => _showIntro = false);
+                    })
+                  : state.paired
+                      ? SessionsPage(state: state)
+                      : PairPage(state: state),
+        );
+      },
     );
   }
 }
