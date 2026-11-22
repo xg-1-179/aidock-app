@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../theme.dart';
 
 /// 代码正文的统一样式：等宽、12.5、行高 1.45，和气泡正文（14 / 1.5）同一视觉节奏。
-const TextStyle _codeStyle = TextStyle(
+TextStyle get _codeStyle => TextStyle(
   fontFamily: 'monospace',
   fontSize: 12.5,
   height: 1.45,

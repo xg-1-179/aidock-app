@@ -911,7 +911,7 @@ class _DetailSheetState extends State<_DetailSheet> {
 
   /// Markdown 只做「能读」的处理：标题、列表、引用、分隔线，其余按等宽正文排。
   List<Widget> _markdownBlocks(String source) {
-    const body = TextStyle(
+    final body = TextStyle(
       fontFamily: 'monospace',
       fontSize: 12.5,
       height: 1.65,
