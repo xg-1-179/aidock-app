@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'downloader.dart';
+
 /// 会话管理员动作里能出错的唯一出口：`message` 已经是给人看的中文，
 /// 页面直接展示即可；`status` 留给调用方做分支（401 该重连、404 该把入口收起来）。
 class SessionsAdminException implements Exception {
