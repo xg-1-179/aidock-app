@@ -8,6 +8,8 @@ class AidockColors {
   static const text = Color(0xFFE7EDF3);
   static const textDim = Color(0xFF8A96A3);
   static const accent = Color(0xFF4DA3FF);
+  /// 自己的气泡底色：比 accent 深一档，白字才够对比度（4.9:1）。
+  static const accentDeep = Color(0xFF2B6FD0);
   static const accentSoft = Color(0x1F4DA3FF);
   static const ok = Color(0xFF35D07F);
   static const warn = Color(0xFFFFB74D);

@@ -17,8 +17,14 @@ class Notifier {
   }
 
   /// [sessionId] 非空时，点通知会带着它回到 App 并直接打开那条会话。
-  static Future<void> show(String title, String body, {String? sessionId}) async {
+  /// 静音时段由 AppState 设置；审批/提问类传 critical: true 可以穿透静音。
+  static bool muted = false;
+
+  static Future<void> show(String title, String body,
+      {String? sessionId, bool critical = false}) async {
     if (body.trim().isEmpty) return;
+    // 静音时段：审批/提问（需要你马上下决定）照样弹，其余按住。
+    if (muted && !critical) return;
     try {
       await _ch.invokeMethod<void>('show', {
         'title': title,

@@ -8,6 +8,9 @@ import 'package:image_picker/image_picker.dart';
 
 import '../app_state.dart';
 import '../theme.dart';
+import '../widgets/image_viewer.dart';
+import '../widgets/message_body.dart';
+import 'schedule_edit_page.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key, required this.state, required this.title});
@@ -26,6 +29,17 @@ class _ChatPageState extends State<ChatPage> {
   List<Map<String, dynamic>> _slash = const [];
   final _scroll = ScrollController();
   int _seen = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // 上次没发完的草稿：切会话/退出都不该丢。
+    final draft = widget.state.draft;
+    if (draft.isNotEmpty) {
+      _input.text = draft;
+      _input.selection = TextSelection.collapsed(offset: draft.length);
+    }
+  }
 
   @override
   void dispose() {
@@ -175,6 +189,7 @@ class _ChatPageState extends State<ChatPage> {
     if (_slash.isNotEmpty) setState(() => _slash = const []);
     if (text.trim().isEmpty) return;
     _input.clear();
+    widget.state.saveDraft('');
     widget.state.send(text);
     Future<void>.delayed(const Duration(milliseconds: 120), _toBottom);
   }
@@ -227,6 +242,19 @@ class _ChatPageState extends State<ChatPage> {
       appBar: AppBar(
         title: Text(widget.title, overflow: TextOverflow.ellipsis),
         actions: [
+          IconButton(
+            tooltip: '给这个会话建定时任务',
+            icon: const Icon(Icons.schedule_rounded, size: 20),
+            onPressed: s.client == null || s.openSessionId == null
+                ? null
+                : () => Navigator.of(context).push(MaterialPageRoute<void>(
+                      builder: (_) => ScheduleEditPage(
+                        client: s.client!,
+                        sessionId: s.openSessionId,
+                        onSaved: s.loadSchedules,
+                      ),
+                    )),
+          ),
           TextButton.icon(
             onPressed: s.openSessionId == null ? null : _pickModel,
             icon: const Icon(Icons.memory, size: 17, color: AidockColors.textDim),
@@ -288,7 +316,10 @@ class _ChatPageState extends State<ChatPage> {
                     child: TextField(
                       controller: _input,
                       focusNode: _focus,
-                      onChanged: _onInputChanged,
+                      onChanged: (v) {
+                        _onInputChanged(v);
+                        widget.state.saveDraft(v);
+                      },
                       minLines: 1,
                       maxLines: 5,
                       textInputAction: TextInputAction.newline,
@@ -500,7 +531,7 @@ class _ChatPageState extends State<ChatPage> {
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.82),
         decoration: BoxDecoration(
-          color: mine ? AidockColors.accent : AidockColors.surface,
+          color: mine ? AidockColors.accentDeep : AidockColors.surface,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(15),
             topRight: const Radius.circular(15),
@@ -598,110 +629,37 @@ class _ChatPageState extends State<ChatPage> {
   Widget _images(ChatMessage m) {
     if (m.images.isEmpty) return const SizedBox.shrink();
     final children = <Widget>[];
-    for (final b64 in m.images.take(4)) {
+    for (var i = 0; i < m.images.length && i < 4; i++) {
       Uint8List bytes;
       try {
-        bytes = base64Decode(b64);
+        bytes = base64Decode(m.images[i]);
       } catch (_) {
         continue;
       }
-      children.add(ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Image.memory(
-          bytes,
-          width: 220,
-          fit: BoxFit.contain,
-          gaplessPlayback: true,
-          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+      children.add(GestureDetector(
+        onTap: () => openImageViewer(context, m.images, i),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Image.memory(
+            bytes,
+            width: 220,
+            fit: BoxFit.contain,
+            gaplessPlayback: true,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          ),
         ),
       ));
     }
     if (children.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
     );
   }
 
-  Widget _body(ChatMessage m, bool mine) {
-    final text = m.text.isEmpty && m.streaming ? '…' : m.text;
-    final color = mine ? const Color(0xFF06121F) : AidockColors.text;
-    final base = TextStyle(fontSize: 14, height: 1.5, color: color);
-    if (m.images.isNotEmpty) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _images(m),
-          _plainOrCode(text, mine, color, base),
-        ],
-      );
-    }
-    return _plainOrCode(text, mine, color, base);
-  }
-
-  Widget _plainOrCode(String text, bool mine, Color color, TextStyle base) {
-    if (mine || !text.contains('```')) {
-      return Text.rich(TextSpan(children: _inline(text, color)), style: base);
-    }
-    final parts = text.split('```');
-    final children = <Widget>[];
-    for (var i = 0; i < parts.length; i++) {
-      final part = parts[i];
-      if (part.trim().isEmpty) continue;
-      if (i.isOdd) {
-        // 首行可能是语言名（```dart），单独去掉，避免当成正文显示。
-        final body = part.replaceFirst(RegExp(r'^[A-Za-z0-9_+#.-]*\r?\n'), '');
-        children.add(Container(
-          width: double.infinity,
-          margin: const EdgeInsets.symmetric(vertical: 6),
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: const Color(0xFF070B10),
-            borderRadius: BorderRadius.circular(9),
-            border: Border.all(color: AidockColors.line),
-          ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Text(
-              body.trimRight(),
-              style: const TextStyle(
-                  fontFamily: 'monospace', fontSize: 12.5, height: 1.45, color: Color(0xFFCFE3FF)),
-            ),
-          ),
-        ));
-      } else {
-        children.add(Text.rich(TextSpan(children: _inline(part, color)), style: base));
-      }
-    }
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: children);
-  }
-
-  /// 极简行内样式：`**粗体**` 与反引号包住的行内代码，其余原样。
-  List<TextSpan> _inline(String text, Color color) {
-    final spans = <TextSpan>[];
-    final pattern = RegExp(r'\*\*([^*]+)\*\*|`([^`]+)`');
-    var at = 0;
-    for (final m in pattern.allMatches(text)) {
-      if (m.start > at) spans.add(TextSpan(text: text.substring(at, m.start)));
-      final bold = m.group(1);
-      if (bold != null) {
-        spans.add(TextSpan(text: bold, style: const TextStyle(fontWeight: FontWeight.w700)));
-      } else {
-        spans.add(TextSpan(
-          text: m.group(2),
-          style: TextStyle(
-            fontFamily: 'monospace',
-            fontSize: 13,
-            color: color,
-            backgroundColor: const Color(0x1AFFFFFF),
-          ),
-        ));
-      }
-      at = m.end;
-    }
-    if (at < text.length) spans.add(TextSpan(text: text.substring(at)));
-    return spans;
-  }
 }
 
 /// 提问卡（宿主 `ask_user_question`）：单选题点一下即选，多选题可反选；

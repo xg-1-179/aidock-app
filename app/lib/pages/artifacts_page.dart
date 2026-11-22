@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app_state.dart';
+import '../downloader.dart';
 import '../theme.dart';
 
 /// 会话产物：这一轮轮跑下来产出的文件，宿主确认还在的才列出来。
@@ -15,6 +16,43 @@ class ArtifactsPage extends StatefulWidget {
 }
 
 class _ArtifactsPageState extends State<ArtifactsPage> {
+  double? _progress;
+  String? _downloading;
+
+  Future<void> _download(String path) async {
+    final client = widget.state.client;
+    if (client == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('还没连上电脑')));
+      return;
+    }
+    setState(() {
+      _downloading = path;
+      _progress = 0;
+    });
+    try {
+      final saved = await AIDockDownloader.download(
+        client,
+        path: path,
+        sessionId: widget.state.openSessionId,
+        onProgress: (v) {
+          if (mounted) setState(() => _progress = v);
+        },
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已保存到 $saved')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _downloading = null;
+          _progress = null;
+        });
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -95,17 +133,38 @@ class _ArtifactsPageState extends State<ArtifactsPage> {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontSize: 11, color: AidockColors.textDim, height: 1.5),
                           ),
-                          trailing: IconButton(
-                            tooltip: '复制路径',
-                            icon: const Icon(Icons.copy_all_outlined, size: 18),
-                            onPressed: () async {
-                              await Clipboard.setData(ClipboardData(text: path));
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('路径已复制')),
-                                );
-                              }
-                            },
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (_downloading == path)
+                                SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    value: _progress,
+                                    color: AidockColors.accent,
+                                  ),
+                                )
+                              else
+                                IconButton(
+                                  tooltip: '下载到手机',
+                                  icon: const Icon(Icons.download_outlined, size: 19),
+                                  onPressed: ok ? () => _download(path) : null,
+                                ),
+                              IconButton(
+                                tooltip: '复制路径',
+                                icon: const Icon(Icons.copy_all_outlined, size: 18),
+                                onPressed: () async {
+                                  await Clipboard.setData(ClipboardData(text: path));
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('路径已复制')),
+                                    );
+                                  }
+                                },
+                              ),
+                            ],
                           ),
                         );
                       },

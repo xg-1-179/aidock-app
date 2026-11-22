@@ -12,6 +12,13 @@ class KeepAlive {
     } catch (_) {}
   }
 
+  /// 打开系统的电池优化设置，让用户把 AIDock 加进白名单（国产 ROM 必做一步）。
+  static Future<void> requestBatteryExemption() async {
+    try {
+      await _ch.invokeMethod<void>('exempt');
+    } catch (_) {}
+  }
+
   static Future<void> stop() async {
     try {
       await _ch.invokeMethod<void>('stop');

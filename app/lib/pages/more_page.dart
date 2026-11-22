@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app_state.dart';
+import '../keepalive.dart';
 import '../theme.dart';
 import 'artifacts_page.dart';
+import 'about_page.dart';
+import 'jobs_page.dart';
+import 'plugins_page.dart';
+import 'schedule_edit_page.dart';
 import 'git_page.dart';
 
 /// 「更多」页：设备管理、定时任务、界面字号、运行日志。
@@ -53,7 +58,21 @@ class _MorePageState extends State<MorePage> {
                 _hint(s.loadingDevices ? '读取中…' : '这台电脑上还没有其它已配对设备'),
               for (final d in s.devices) _deviceRow(s, d),
               const SizedBox(height: 24),
-              _section('定时任务', trailing: _refresh(s.loadingSchedules, s.loadSchedules)),
+              _section('定时任务', trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                _refresh(s.loadingSchedules, s.loadSchedules),
+                IconButton(
+                  tooltip: '新建定时任务',
+                  icon: const Icon(Icons.add_rounded, size: 20),
+                  onPressed: s.client == null
+                      ? null
+                      : () => Navigator.of(context).push(MaterialPageRoute<void>(
+                            builder: (_) => ScheduleEditPage(
+                              client: s.client!,
+                              onSaved: s.loadSchedules,
+                            ),
+                          )),
+                ),
+              ])),
               if (s.schedules.isEmpty)
                 _hint(s.loadingSchedules ? '读取中…' : '还没有定时任务'),
               for (final r in s.schedules) _scheduleRow(s, r),
@@ -76,9 +95,54 @@ class _MorePageState extends State<MorePage> {
                   MaterialPageRoute(builder: (_) => ArtifactsPage(state: s)),
                 ),
               ),
+              _linkTile(
+                icon: Icons.memory,
+                title: '后台任务',
+                subtitle: '电脑上正在跑的命令，可以在这里掐掉',
+                enabled: s.client != null,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => JobsPage(client: s.client!)),
+                ),
+              ),
+              _linkTile(
+                icon: Icons.extension_outlined,
+                title: '插件',
+                subtitle: '装 / 卸 / 启停电脑上的插件',
+                enabled: s.client != null,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => PluginsPage(client: s.client!)),
+                ),
+              ),
               const SizedBox(height: 24),
               _section('界面'),
+              _quietTile(s),
               _textScaleTile(s),
+              _linkTile(
+                icon: Icons.battery_saver_outlined,
+                title: '让系统别杀后台',
+                subtitle: '加入电池优化白名单，锁屏时也能收消息',
+                onTap: () async {
+                  await KeepAlive.requestBatteryExemption();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('已打开系统设置，找到 AIDock 选「不限制」')),
+                    );
+                  }
+                },
+              ),
+              _linkTile(
+                icon: Icons.info_outline,
+                title: '关于 AIDock',
+                subtitle: '版本 · 检查更新 · 开源许可',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => AboutPage(
+                      currentVersion: '0.16.0',
+                      onLogout: () => s.forgetSaved(),
+                    ),
+                  ),
+                ),
+              ),
               const SizedBox(height: 24),
               _section('运行日志', trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                 TextButton(
@@ -259,6 +323,91 @@ class _MorePageState extends State<MorePage> {
         ),
       ),
     );
+  }
+
+  Widget _quietTile(AppState s) {
+    final on = s.quietEnabled;
+    final range = '${s.quietStart.toString().padLeft(2, '0')}:00 – '
+        '${s.quietEnd.toString().padLeft(2, '0')}:00';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: AidockColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AidockColors.line),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.nightlight_round, size: 18, color: AidockColors.textDim),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('免打扰时段', style: TextStyle(fontSize: 14)),
+                const SizedBox(height: 2),
+                Text(
+                  on ? '这段时间只推送审批和提问 · $range' : '关着：任何提醒都会响',
+                  style: const TextStyle(fontSize: 11.5, color: AidockColors.textDim),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () => _editQuiet(s),
+            child: const Text('时段'),
+          ),
+          Switch(
+            value: on,
+            activeColor: AidockColors.accent,
+            onChanged: (v) => s.setQuiet(enabled: v, start: s.quietStart, end: s.quietEnd),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _editQuiet(AppState s) async {
+    final startCtl = TextEditingController(text: '${s.quietStart}');
+    final endCtl = TextEditingController(text: '${s.quietEnd}');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: const Text('免打扰时段'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('填 0–23 的整点，跨夜也行（23 到 8 表示晚上 11 点到早上 8 点）。',
+                style: TextStyle(fontSize: 12.5, height: 1.5, color: AidockColors.textDim)),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: TextField(controller: startCtl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: '开始'))),
+                const SizedBox(width: 12),
+                Expanded(child: TextField(controller: endCtl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: '结束'))),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dctx, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(dctx, true), child: const Text('保存')),
+        ],
+      ),
+    );
+    if (ok == true) {
+      final a = int.tryParse(startCtl.text.trim()) ?? s.quietStart;
+      final b = int.tryParse(endCtl.text.trim()) ?? s.quietEnd;
+      await s.setQuiet(
+        enabled: true,
+        start: a.clamp(0, 23).toInt(),
+        end: b.clamp(0, 23).toInt(),
+      );
+    }
+    startCtl.dispose();
+    endCtl.dispose();
   }
 
   Widget _textScaleTile(AppState s) {

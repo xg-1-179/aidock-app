@@ -11,6 +11,26 @@ import 'keepalive.dart';
 import 'notify.dart';
 
 /// 待发的一张图：文件名、MIME、原始字节。
+/// 一条「暂时发不出去」的消息：网络断了先存本地，等连上按顺序补发。
+class OutboxItem {
+  OutboxItem({required this.sessionId, required this.text, this.at = 0});
+  final String sessionId;
+  final String text;
+  final int at;
+
+  Map<String, dynamic> toJson() =>
+      {'sessionId': sessionId, 'text': text, 'at': at};
+
+  static OutboxItem? fromJson(dynamic raw) {
+    if (raw is! Map) return null;
+    final sid = '${raw['sessionId'] ?? ''}';
+    final text = '${raw['text'] ?? ''}';
+    if (sid.isEmpty || text.isEmpty) return null;
+    return OutboxItem(sessionId: sid, text: text, at: int.tryParse('${raw['at'] ?? 0}') ?? 0);
+  }
+}
+
+/// 一条「暂时发不出去」的消息：网络断了先存本地，等连上按顺序补发。
 class OutgoingImage {
   const OutgoingImage({
     required this.name,
@@ -213,6 +233,32 @@ class AppState extends ChangeNotifier {
   /// App 是否在前台；后台时收到审批/提问才发系统通知。
   bool appForeground = true;
 
+  /// 静音时段（只挡通知，不挡消息）。
+  bool quietEnabled = false;
+  int quietStart = 23;
+  int quietEnd = 8;
+
+  /// 现在是不是该闭嘴。
+  bool get quietNow {
+    if (!quietEnabled) return false;
+    final h = DateTime.now().hour;
+    return quietStart <= quietEnd
+        ? (h >= quietStart && h < quietEnd)
+        : (h >= quietStart || h < quietEnd);
+  }
+
+  /// 待发队列（断网时攒下的消息）。
+  final List<OutboxItem> outbox = [];
+  int get outboxCount => outbox.length;
+
+  /// 每个会话各自的草稿。
+  final Map<String, String> _drafts = {};
+  String get draft => _drafts[openSessionId ?? ''] ?? '';
+
+  /// 冷启动时要自动回到的会话。
+  String? restoreSessionId;
+  bool _restored = false;
+
   /// 连过的电脑（最近连的排最前）。
   final List<SavedMachine> machines = [];
 
@@ -243,6 +289,10 @@ class AppState extends ChangeNotifier {
 
   // ---- 界面偏好：字号 ----
   static const String _kTextScale = 'aidock.textScale';
+  static const String _kQuiet = 'aidock.quiet';
+  static const String _kDrafts = 'aidock.drafts';
+  static const String _kOutbox = 'aidock.outbox';
+  static const String _kLastSession = 'aidock.lastSession';
   double textScale = 1.0;
 
   // ---- 运行日志（导出给开发者看的那种，只有最近 200 行）----
@@ -725,6 +775,17 @@ class AppState extends ChangeNotifier {
       error = '读取会话失败：$e';
     }
     notifyListeners();
+    _maybeRestoreSession();
+  }
+
+  /// 冷启动时回到上次那个会话（只在第一次刷新后做一次）。
+  void _maybeRestoreSession() {
+    if (_restored || restoreSessionId == null) return;
+    final id = restoreSessionId!;
+    final hit = sessions.where((e) => e.id == id);
+    if (hit.isEmpty) return;
+    _restored = true;
+    unawaited(openSession(hit.first));
   }
 
   /// 在电脑上新开一个会话，再刷新列表并直接打开它。
@@ -893,6 +954,7 @@ class AppState extends ChangeNotifier {
       messages.add(ChatMessage(role: 'system', text: '历史读取失败：$e'));
     }
     notifyListeners();
+    unawaited(_rememberSession(item.id));
     _attachStream(c, item.id);
     // 顶栏要显示当前模型，进会话就顺手拉一次（失败不阻塞打开）。
     unawaited(loadModels());
@@ -1031,6 +1093,7 @@ class AppState extends ChangeNotifier {
       try {
         await _catchUp(c, sessionId);
         _attachStream(c, sessionId);
+        unawaited(flushOutbox());
       } catch (e) {
         if (openSessionId != sessionId) return;
         if (_isAuthError(e)) {
@@ -1196,8 +1259,10 @@ class AppState extends ChangeNotifier {
             questions: items,
           ));
           if (isNew && !appForeground) {
+            Notifier.muted = quietNow;
             unawaited(Notifier.show('电脑在等你回答', items.first.text,
-          sessionId: '${inner['sessionId'] ?? payload['sessionId'] ?? ''}'));
+                sessionId: '${inner['sessionId'] ?? payload['sessionId'] ?? ''}',
+                critical: true));
           }
         }
         break;
@@ -1222,9 +1287,12 @@ class AppState extends ChangeNotifier {
           approvals.removeWhere((e) => e.approvalId == card.approvalId);
           approvals.add(card);
           if (isNew && !appForeground) {
+            Notifier.muted = quietNow;
             unawaited(Notifier.show(
               '需要你批准：${card.toolName.isEmpty ? '工具调用' : card.toolName}',
               card.fact.isNotEmpty ? card.fact : card.reason,
+              sessionId: card.sessionId,
+              critical: true,
             ));
           }
         }
@@ -1235,8 +1303,9 @@ class AppState extends ChangeNotifier {
         break;
       case 'turn/end':
         if (!appForeground && streamingNow) {
+          Notifier.muted = quietNow;
           unawaited(Notifier.show('这一轮跑完了', _lastAssistantText(),
-          sessionId: openSessionId));
+              sessionId: openSessionId));
         }
         break;
       case 'step/end':
@@ -1439,6 +1508,8 @@ class AppState extends ChangeNotifier {
       bubble.failed = true;
       error = '发送失败：$e';
       logLine('send 失败：$e');
+      outbox.add(OutboxItem(sessionId: sid, text: text.trim(), at: DateTime.now().millisecondsSinceEpoch));
+      unawaited(_persistOutbox());
       notifyListeners();
     }
   }
@@ -1712,6 +1783,114 @@ class AppState extends ChangeNotifier {
     try {
       await c.stop(sid);
     } catch (_) {}
+  }
+
+  /// 读本地杂项（草稿、待发、静音、上次会话）。启动时调一次。
+  Future<void> loadLocalExtras() async {
+    final p = await SharedPreferences.getInstance();
+    quietEnabled = p.getBool(_kQuiet) ?? false;
+    final qs = p.getInt('aidock.quietStart');
+    final qe = p.getInt('aidock.quietEnd');
+    if (qs != null) quietStart = qs;
+    if (qe != null) quietEnd = qe;
+    final rawDrafts = p.getString(_kDrafts);
+    if (rawDrafts != null && rawDrafts.isNotEmpty) {
+      try {
+        final map = jsonDecode(rawDrafts);
+        if (map is Map) {
+          for (final e in map.entries) {
+            _drafts['${e.key}'] = '${e.value}';
+          }
+        }
+      } catch (_) {}
+    }
+    final rawOutbox = p.getString(_kOutbox);
+    if (rawOutbox != null && rawOutbox.isNotEmpty) {
+      try {
+        final list = jsonDecode(rawOutbox);
+        if (list is List) {
+          for (final row in list) {
+            final item = OutboxItem.fromJson(row);
+            if (item != null) outbox.add(item);
+          }
+        }
+      } catch (_) {}
+    }
+    final last = p.getString(_kLastSession);
+    if (last != null && last.isNotEmpty) restoreSessionId = last;
+    notifyListeners();
+  }
+
+  Future<void> setQuiet({bool? enabled, int? start, int? end}) async {
+    if (enabled != null) quietEnabled = enabled;
+    if (start != null) quietStart = start;
+    if (end != null) quietEnd = end;
+    notifyListeners();
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_kQuiet, quietEnabled);
+    await p.setInt('aidock.quietStart', quietStart);
+    await p.setInt('aidock.quietEnd', quietEnd);
+  }
+
+  Future<void> saveDraft(String text) async {
+    final sid = openSessionId;
+    if (sid == null) return;
+    if (text.isEmpty) {
+      _drafts.remove(sid);
+    } else {
+      _drafts[sid] = text;
+    }
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kDrafts, jsonEncode(_drafts));
+  }
+
+  void clearDraft(String sessionId) {
+    _drafts.remove(sessionId);
+    notifyListeners();
+  }
+
+  Future<void> _persistOutbox() async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(
+      _kOutbox,
+      jsonEncode(outbox.map((e) => e.toJson()).toList()),
+    );
+  }
+
+  /// 网络回来 / 重连成功时把攒下的消息按顺序补发。
+  Future<void> flushOutbox() async {
+    final c = _client;
+    if (c == null || outbox.isEmpty) return;
+    final pending = outbox.where((e) => e.sessionId == openSessionId).toList()
+      ..sort((a, b) => a.at.compareTo(b.at));
+    if (pending.isEmpty) return;
+    final still = <OutboxItem>[];
+    for (final item in pending) {
+      try {
+        await c.sendMessage(item.sessionId, item.text);
+        logLine('补发成功：${item.text.length} 字');
+      } catch (e) {
+        still.add(item);
+        logLine('补发失败：$e');
+        break;
+      }
+    }
+    outbox
+      ..removeWhere(pending.contains)
+      ..addAll(still);
+    await _persistOutbox();
+    notifyListeners();
+  }
+
+  Future<void> dropOutbox() async {
+    outbox.clear();
+    await _persistOutbox();
+    notifyListeners();
+  }
+
+  Future<void> _rememberSession(String sessionId) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kLastSession, sessionId);
   }
 
   Future<void> disconnect() async {

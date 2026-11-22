@@ -5,6 +5,7 @@ import '../app_state.dart';
 import '../theme.dart';
 import 'chat_page.dart';
 import 'more_page.dart';
+import 'search_page.dart';
 
 class SessionsPage extends StatefulWidget {
   const SessionsPage({super.key, required this.state});
@@ -83,6 +84,18 @@ class _SessionsPageState extends State<SessionsPage> {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: '搜索会话',
+            icon: const Icon(Icons.search_rounded, size: 20),
+            onPressed: state.client == null
+                ? null
+                : () => Navigator.of(context).push(MaterialPageRoute<void>(
+                      builder: (_) => SearchPage(
+                        client: state.client!,
+                        onOpenSession: (id, title) => state.openSessionById(id),
+                      ),
+                    )),
+          ),
           IconButton(
             tooltip: '刷新',
             onPressed: state.busy ? null : state.refreshSessions,

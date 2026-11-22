@@ -1,8 +1,12 @@
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_state.dart';
+import 'crash_log.dart';
 import 'deeplink.dart';
 import 'notify.dart';
 import 'pages/intro_page.dart';
@@ -25,14 +29,23 @@ class _AidockAppState extends State<AidockApp> with WidgetsBindingObserver {
   /// 第一次打开时先给一页三步说明，看完写标记就不再出现。
   static const String _kIntroSeen = 'aidock.introSeen';
   bool? _showIntro;
+  StreamSubscription<List<ConnectivityResult>>? _conn;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    CrashLog.init();
     // 上次连过的电脑：读出来让配对页可以先给一个「直接回去」的入口。
     state.loadSaved();
     state.loadUiPrefs();
+    state.loadLocalExtras();
+    // 切网（WiFi ↔ 4G、飞行模式回来）是断流最常见的原因：一有变化就立刻补一次重连，
+    // 不要干等 10 秒心跳看门狗。
+    _conn = Connectivity().onConnectivityChanged.listen((_) {
+      if (!mounted) return;
+      state.onResumed();
+    });
     // 通知权限：Android 13+ 会弹一次系统框；用户拒了也不影响其他功能。
     Notifier.ask();
     SharedPreferences.getInstance().then((p) {
@@ -62,6 +75,7 @@ class _AidockAppState extends State<AidockApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _conn?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     state.dispose();
     super.dispose();

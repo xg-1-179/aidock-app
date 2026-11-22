@@ -57,6 +57,19 @@ class MainActivity : FlutterActivity() {{
                         stopService(android.content.Intent(this, AidockService::class.java))
                         result.success(true)
                     }}
+                    // 国产 ROM 会掐后台：把用户送到「电池优化」页，让他自己加白名单。
+                    "exempt" -> {{
+                        try {{
+                            val intent = android.content.Intent(
+                                android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS
+                            )
+                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(intent)
+                            result.success(true)
+                        }} catch (e: Exception) {{
+                            result.error("no-settings", e.message, null)
+                        }}
+                    }}
                     else -> result.notImplemented()
                 }}
             }}
