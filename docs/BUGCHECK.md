@@ -194,3 +194,15 @@
 | 长按菜单 | `_messageMenu`：复制 `/` 引用（`> ` 前缀，160 字截断） | 复制到剪贴板、引用后输入框带 `>` |
 | 多图发送 | `AppState.sendImages(List<OutgoingImage>, text:)`，`pickMultiImage(limit: 9)` | 单张 >7MB 与总量 >7MB 都在本地先拦住，不浪费一轮 |
 | 计划文档 | `docs/PLAN.md`：P0/P1/P2 与「想清楚再动」的理由、验证方式 | 人工阅读 |
+
+## 二十一、深色 / 浅色双主题（apk-91）
+
+| 项 | 结果 | 说明 |
+|---|---|---|
+| 配色表 | ✅ | `AidockPalette`（12 色）拆出 `kAidockDark` / `kAidockLight`，`AidockColors` 改为可变 `palette` + getter，`apply(light)` 运行时切换 |
+| 编译期常量 | ✅ | 全项目 213 处 `const` 去掉（引用配色的构造不能再是编译期常量），CI `android #91` 通过 |
+| 切换入口 | ✅ | 「更多 → 浅色模式」开关，写 `aidock.lightMode`，冷启动 `loadUiPrefs()` 恢复 |
+| 整树重绘 | ✅ | `MaterialApp` 套进 `AnimatedBuilder`，切主题后底部面板、SnackBar 也换色 |
+| 对比度 | ✅（手算） | 浅色：正文 `#141A21` on `#F6F7F9` ≈ 15:1；强调 `#1F6FE0` on 白 ≈ 4.9:1；按钮前景用 `AidockColors.onAccent` 自动取黑/白 |
+| 硬编码色 | ✅ | 分隔线、警告色、按钮前景三类共 8 处归一到调色板 |
+| 真机目视 | ⏳ | 需要用户在手机上切一次确认观感 |
