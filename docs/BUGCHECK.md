@@ -174,3 +174,23 @@
 | 通知点击回会话 | 原生 `PendingIntent` 带 `aidock://open?session=<id>`；Dart `DeepLink.sessionOf` → `pendingOpenSession` → 自动进聊天页 | 已进包，待真机核 |
 
 > 设备与定时任务走的是宿主「原路径」，这些 handler 是热重载之前那一代注册的，凭据库不认新配对 → **重启一次 DSH 宿主**后即可用（`/link/*` 别名一直可用）。
+
+## 十九、第二批补齐（Git / 产物 / 保活 / 引导 / 分叉）
+
+| 项 | 实现 | 验证 |
+|---|---|---|
+| Git 面板 | `GitPage` 打 `/git/status` + `/git/log?limit=20`，四组改动 + 最近提交，点行看 `/git/diff` | 契约按宿主源码核对；运行前需宿主重启（旧 handler 不认新凭据，会回 401 `e2ee-unknown-device`） |
+| 会话产物 | `ArtifactsPage` 打 `POST /session/artifacts {sessionId, paths}`，路径取自历史里 `producedFiles` / `fileChanges[].path` | 同上 |
+| 前台保活 | `KeepAlive` → `aidock/keepalive` → `AidockService`（`startForeground(9, …)`，`IMPORTANCE_LOW`，`START_STICKY`） | 模板渲染自检 `braces 0`、`has service True`；连上即起、断开即停 |
+| 首次引导 | `IntroPage` 三步说明，`aidock.introSeen` 存进 `SharedPreferences` | 静态检查 |
+| 分叉会话 | 会话长按 → 从这里分叉 → `POST /session/fork {sessionId}` | 契约按 `lib/mobile/session-send.js:289 handleFork` 核对；非幂等，只在用户点击时调一次 |
+| 未做 | 插件市场（移动端只有 HTML 扩展包目录，与 DSH 插件市场不是一回事）、真·浅色主题（`AidockColors` 是常量，改主题要整体换扩展） | 已在交付说明里写明 |
+
+## 二十、第三批：失败重发 / 长按菜单 / 多图发送
+
+| 项 | 实现 | 验证 |
+|---|---|---|
+| 失败重发 | `ChatMessage.failed` 标记；`AppState.retryMessage` 摘掉坏气泡再走一遍 `send()` | 断网发送 → 出现重发按钮；恢复网络点一下只留一条 |
+| 长按菜单 | `_messageMenu`：复制 `/` 引用（`> ` 前缀，160 字截断） | 复制到剪贴板、引用后输入框带 `>` |
+| 多图发送 | `AppState.sendImages(List<OutgoingImage>, text:)`，`pickMultiImage(limit: 9)` | 单张 >7MB 与总量 >7MB 都在本地先拦住，不浪费一轮 |
+| 计划文档 | `docs/PLAN.md`：P0/P1/P2 与「想清楚再动」的理由、验证方式 | 人工阅读 |

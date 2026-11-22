@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:image_picker/image_picker.dart';
 
@@ -19,6 +20,7 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   final _input = TextEditingController();
+  final _focus = FocusNode();
 
   /// 输入框以 `/` 开头时的候选命令（前缀过滤后的结果）。
   List<Map<String, dynamic>> _slash = const [];
@@ -28,6 +30,7 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void dispose() {
     _input.dispose();
+    _focus.dispose();
     _scroll.dispose();
     widget.state.closeSession();
     super.dispose();
@@ -129,23 +132,30 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
+  /// 选图：相册可多选，选完连输入框里的正文一起发。
   Future<void> _pickImage() async {
     final s = widget.state;
     if (s.openSessionId == null) return;
     try {
-      final file = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
+      final picked = await ImagePicker().pickMultiImage(
         maxWidth: 1600,
         maxHeight: 1600,
         imageQuality: 78,
+        limit: 9,
       );
-      if (file == null) return;
-      final bytes = await file.readAsBytes();
-      await s.sendImage(
-        name: file.name.isEmpty ? 'image.jpg' : file.name,
-        mediaType: _mediaTypeOf(file.name),
-        bytes: bytes,
-      );
+      if (picked.isEmpty) return;
+      final items = <OutgoingImage>[];
+      for (final file in picked) {
+        items.add(OutgoingImage(
+          name: file.name.isEmpty ? 'image.jpg' : file.name,
+          mediaType: _mediaTypeOf(file.name),
+          bytes: await file.readAsBytes(),
+        ));
+      }
+      final caption = _input.text.trim();
+      if (caption.isNotEmpty) _input.clear();
+      await s.sendImages(items, text: caption);
+      if (mounted) Future<void>.delayed(const Duration(milliseconds: 120), _toBottom);
     } catch (e) {
       s.setError('选图失败：$e');
     }
@@ -277,6 +287,7 @@ class _ChatPageState extends State<ChatPage> {
                   Expanded(
                     child: TextField(
                       controller: _input,
+                      focusNode: _focus,
                       onChanged: _onInputChanged,
                       minLines: 1,
                       maxLines: 5,
@@ -292,7 +303,7 @@ class _ChatPageState extends State<ChatPage> {
                     width: 42,
                     height: 46,
                     child: IconButton(
-                      tooltip: '发图片',
+                      tooltip: '发图片（可多选）',
                       onPressed: _pickImage,
                       icon: const Icon(Icons.image_outlined, size: 22),
                       color: AidockColors.textDim,
@@ -482,8 +493,8 @@ class _ChatPageState extends State<ChatPage> {
       );
     }
     final mine = m.role == 'user';
-    return Align(
-      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+    final bubble = GestureDetector(
+      onLongPress: () => _messageMenu(m),
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
@@ -501,6 +512,81 @@ class _ChatPageState extends State<ChatPage> {
         child: _body(m, mine),
       ),
     );
+    return Align(
+      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+      child: Column(
+        crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          bubble,
+          // 没发出去的那条：气泡下面挂一行「重发」，点一下摘掉坏气泡重走一遍。
+          if (m.failed)
+            Padding(
+              padding: const EdgeInsets.only(top: 2, bottom: 4, right: 4),
+              child: TextButton.icon(
+                onPressed: () => widget.state.retryMessage(m),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                  minimumSize: const Size(0, 30),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  foregroundColor: AidockColors.warn,
+                ),
+                icon: const Icon(Icons.rotate_left_rounded, size: 15),
+                label: const Text('没发出去，重发', style: TextStyle(fontSize: 12)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// 长按某条消息：复制原文，或者把它作为引用塞回输入框。
+  Future<void> _messageMenu(ChatMessage m) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AidockColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.copy_rounded, size: 20),
+              title: const Text('复制这条消息', style: TextStyle(fontSize: 14)),
+              onTap: () => Navigator.of(ctx).pop('copy'),
+            ),
+            if (m.role != 'system')
+              ListTile(
+                leading: const Icon(Icons.format_quote_rounded, size: 20),
+                title: const Text('引用它再发一条', style: TextStyle(fontSize: 14)),
+                onTap: () => Navigator.of(ctx).pop('quote'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'copy') {
+      await Clipboard.setData(ClipboardData(text: m.text));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('已复制')));
+      return;
+    }
+    if (action == 'quote') {
+      final snippet = m.text.trim();
+      final cut = snippet.length > 160 ? '${snippet.substring(0, 160)}…' : snippet;
+      final quoted = cut
+          .split('\n')
+          .map((line) => line.isEmpty ? '>' : '> $line')
+          .join('\n');
+      final current = _input.text;
+      _input.text = current.isEmpty ? '$quoted\n\n' : '$quoted\n\n$current';
+      _input.selection = TextSelection.collapsed(offset: _input.text.length);
+      _focus.requestFocus();
+      setState(() {});
+    }
   }
 
   /// 消息正文：用户气泡保持纯文本，助手消息按 ``` 切成「散文 / 代码」交替渲染。

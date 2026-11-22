@@ -10,11 +10,24 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'keepalive.dart';
 import 'notify.dart';
 
+/// 待发的一张图：文件名、MIME、原始字节。
+class OutgoingImage {
+  const OutgoingImage({
+    required this.name,
+    required this.mediaType,
+    required this.bytes,
+  });
+  final String name;
+  final String mediaType;
+  final List<int> bytes;
+}
+
 class ChatMessage {
   ChatMessage({
     required this.role,
     required this.text,
     this.streaming = false,
+    this.failed = false,
     List<String>? images,
     List<String>? produced,
   })  : images = images ?? <String>[],
@@ -22,6 +35,9 @@ class ChatMessage {
   final String role;
   String text;
   bool streaming;
+
+  /// 这条消息没发出去（网络/宿主拒绝）。气泡下面会给一颗「重发」。
+  bool failed;
 
   /// 这一轮产出的文件路径（历史里 `producedFiles` / `fileChanges` 收上来的）。
   final List<String> produced;
@@ -1412,70 +1428,100 @@ class AppState extends ChangeNotifier {
         messages.first.text == '这个会话还没有消息') {
       messages.clear();
     }
-    messages.add(ChatMessage(role: 'user', text: text.trim()));
+    final bubble = ChatMessage(role: 'user', text: text.trim());
+    messages.add(bubble);
     streamingNow = true;
     notifyListeners();
     try {
       await c.sendMessage(sid, text.trim());
     } catch (e) {
       streamingNow = false;
-      messages.add(ChatMessage(role: 'system', text: '发送失败：$e'));
+      bubble.failed = true;
+      error = '发送失败：$e';
+      logLine('send 失败：$e');
       notifyListeners();
     }
   }
 
-  /// 发一张图（可带一句正文）。
+  /// 重发一条失败的消息：把坏气泡摘掉再走一遍正常发送，避免列表里留两遍。
+  Future<void> retryMessage(ChatMessage message) async {
+    if (message.role != 'user') return;
+    final text = message.text;
+    messages.remove(message);
+    notifyListeners();
+    await send(text);
+  }
+
+  /// 一条消息里带一张或多张图（可附一句正文）。
   ///
-  /// 宿主只认 `content` 块数组；图片块 `data` 是 base64，`mediaType` 要可读（
-  /// `history-derive.js` 靠它决定下发形状），否则桌面端渲染不出图。
-  Future<void> sendImage({
-    required String name,
-    required String mediaType,
-    required List<int> bytes,
-    String text = '',
-  }) async {
+  /// 宿主只认 `content` 块数组；图片块 `data` 是 base64，`mediaType` 要可读
+  /// （`history-derive.js` 靠它决定下发形状），否则桌面端渲染不出图。
+  /// 单条消息 ≤ 8MB 明文，所以多图时按总大小卡一道，别让用户等一轮才失败。
+  Future<void> sendImages(List<OutgoingImage> items, {String text = ''}) async {
     final c = _client;
     final sid = openSessionId;
-    if (c == null || sid == null) return;
+    if (c == null || sid == null || items.isEmpty) return;
     if (messages.length == 1 &&
         messages.first.role == 'system' &&
         messages.first.text == '这个会话还没有消息') {
       messages.clear();
     }
     final body = text.trim();
-    // 宿主单条消息 ≤ 8MB 明文（SEND_MAX_BODY = ceil(8MB*4/3)），超了会被整条拒掉，
-    // 与其让用户等一轮失败，不如当场说清楚该压到多大。
-    if (bytes.length > 7 * 1024 * 1024) {
-      error = '这张图 ${(bytes.length / 1048576).toStringAsFixed(1)}MB，太大了：'
-          '单张请压到 7MB 以内再发';
+    var total = 0;
+    for (final it in items) {
+      total += it.bytes.length;
+      if (it.bytes.length > 7 * 1024 * 1024) {
+        error = '「${it.name}」${(it.bytes.length / 1048576).toStringAsFixed(1)}MB，'
+            '单张请压到 7MB 以内再发';
+        notifyListeners();
+        return;
+      }
+    }
+    if (total > 7 * 1024 * 1024) {
+      error = '这些图一共 ${(total / 1048576).toStringAsFixed(1)}MB，'
+          '一条消息请压到 7MB 以内（少选几张或先压缩）';
       notifyListeners();
       return;
     }
-    final encoded = base64Encode(bytes);
+    final encoded = items.map((e) => base64Encode(e.bytes)).toList();
     final content = <Map<String, dynamic>>[
       if (body.isNotEmpty) {'type': 'text', 'text': body},
-      {
-        'type': 'image',
-        'data': encoded,
-        'mediaType': mediaType,
-        'name': name,
-      },
+      for (var i = 0; i < items.length; i++)
+        {
+          'type': 'image',
+          'data': encoded[i],
+          'mediaType': items[i].mediaType,
+          'name': items[i].name,
+        },
     ];
-    messages.add(ChatMessage(
+    final label = items.length == 1 ? '（图片）${items.first.name}' : '（${items.length} 张图片）';
+    final bubble = ChatMessage(
       role: 'user',
-      text: body.isEmpty ? '（图片）$name' : '$body\n（图片）$name',
-      images: [encoded],
-    ));
+      text: body.isEmpty ? label : '$body\n$label',
+      images: encoded,
+    );
+    messages.add(bubble);
     streamingNow = true;
     notifyListeners();
     try {
       await c.sendContent(sid, content);
     } catch (e) {
       streamingNow = false;
-      messages.add(ChatMessage(role: 'system', text: '发送失败：$e'));
+      bubble.failed = true;
+      error = '发送失败：$e';
+      logLine('sendImages 失败：$e');
       notifyListeners();
     }
   }
+
+  /// 发一张图（可带一句正文）：单张走同一条路，省一套重复逻辑。
+  Future<void> sendImage({
+    required String name,
+    required String mediaType,
+    required List<int> bytes,
+    String text = '',
+  }) =>
+      sendImages([OutgoingImage(name: name, mediaType: mediaType, bytes: bytes)], text: text);
 
   /// 读当前会话的 Git 状态（工作区里的仓库）。只读：只看不改。
   Future<void> loadGit() async {
