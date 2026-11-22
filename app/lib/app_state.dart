@@ -1657,7 +1657,7 @@ class AppState extends ChangeNotifier {
     try {
       final ws = await _gitWorkspaceId(c);
       if (ws == null) {
-        gitStatus = null;
+        gitStatus = const <String, dynamic>{};
         gitCommits = [];
         gitError = '这条电脑还没登记工作区，先在桌面端打开一次会话';
         return;
