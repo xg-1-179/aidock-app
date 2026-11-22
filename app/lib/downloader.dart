@@ -51,6 +51,9 @@ class AIDockDownloader {
   /// 取字节的端点。放行面由宿主判：已登记工作区 ∪ 本会话的项目目录。
   static const String readPath = '/api/mobile/v1/file/read';
 
+  /// 清单打包（`/session/archive`）的分块信封与单文件同一套，只有 AAD 里的路径不同。
+  static const String archivePath = '/api/mobile/v1/link/session/archive';
+
   static const String _chunksType = 'application/x-dsh-e2ee-chunks';
   static const int _framePrefixBytes = 4 + 12;
   static const int _tagBytes = 16;
@@ -228,6 +231,117 @@ class AIDockDownloader {
       index += 1;
     }
     return out.toBytes();
+  }
+
+
+  /// 把这条会话的若干产物打成 zip 存到手机上下载目录，回存盘路径。
+  ///
+  /// 宿主 `/session/archive` 回的是协议 v2 分块信封（`[4B 长][12B nonce][密文+tag]`），
+  /// AAD 绑的是**这条请求的路径**，块序号从 1 起，末尾那块是 0 字节的认证尾块。
+  static Future<String> downloadArchive(
+    DshClient client, {
+    required String sessionId,
+    required List<String> paths,
+    void Function(double)? onProgress,
+  }) async {
+    final usable = paths.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    if (usable.isEmpty) {
+      throw DownloadException('这条会话还没有可以打包的产物');
+    }
+    final env = await DshEnvelope.build(
+      keys: client.keys,
+      keyId: client.keyId,
+      method: 'POST',
+      path: archivePath,
+      query: '',
+      payload: {'sessionId': sessionId, 'paths': usable},
+    );
+    final base = client.baseUrl;
+    final uri = Uri.parse('${base.scheme}://${base.authority}$archivePath');
+    final http = HttpClient()..connectionTimeout = _connectTimeout;
+    final dir = await downloadDirectory();
+    final stamp = DateTime.now()
+        .toIso8601String()
+        .replaceAll(RegExp(r'[^0-9]'), '')
+        .padLeft(14, '0')
+        .substring(0, 14);
+    final file = File('${dir.path}${Platform.pathSeparator}dsh-artifacts-$stamp.zip');
+    IOSink? sink;
+    try {
+      final req = await http.postUrl(uri).timeout(_connectTimeout);
+      env.headers.forEach(req.headers.set);
+      req.headers.set(HttpHeaders.acceptEncodingHeader, 'identity');
+      final token = client.authToken;
+      if (token != null && token.isNotEmpty) {
+        req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      }
+      final credential = client.deviceCredential;
+      if (credential != null && credential.isNotEmpty) {
+        req.headers.set('X-Dsh-Device-Credential', credential);
+      }
+      final body = utf8.encode(env.body);
+      req.contentLength = body.length;
+      req.add(body);
+      final res = await req.close().timeout(_headerTimeout);
+
+      if (res.statusCode != 200) {
+        final builder = BytesBuilder(copy: false);
+        await for (final part in res.timeout(_bodyTimeout)) {
+          builder.add(part);
+        }
+        throw await _errorOf(
+          client,
+          _RangeResponse(
+            status: res.statusCode,
+            headers: const {},
+            bytes: builder.toBytes(),
+            env: env,
+          ),
+        );
+      }
+
+      final total = int.tryParse((res.headers.value('x-dsh-file-size') ?? '').trim()) ?? -1;
+      onProgress?.call(0);
+      sink = file.openWrite();
+      final pending = <int>[];
+      var seq = 0;
+      var written = 0;
+      await for (final part in res.timeout(_bodyTimeout)) {
+        pending.addAll(part);
+        while (pending.length >= 4) {
+          final len = (pending[0] << 24) | (pending[1] << 16) | (pending[2] << 8) | pending[3];
+          if (pending.length < 16 + len) break;
+          final nonce = pending.sublist(4, 16);
+          final cipher = pending.sublist(16, 16 + len);
+          pending.removeRange(0, 16 + len);
+          seq += 1;
+          final clear = await DshCrypto.open(
+            key: client.keys.down,
+            sealed: <int>[...nonce, ...cipher],
+            aad: 'v2|down|file|$archivePath|${env.nonce}|$seq',
+          );
+          if (clear.isEmpty) continue;
+          sink.add(clear);
+          written += clear.length;
+          if (total > 0) onProgress?.call((written / total).clamp(0.0, 1.0));
+        }
+      }
+      await sink.flush();
+      await sink.close();
+      sink = null;
+      if (written == 0) {
+        throw DownloadException('电脑回了一个空包：这些文件可能已经不在电脑上了');
+      }
+      onProgress?.call(1);
+      return file.path;
+    } finally {
+      if (sink != null) {
+        try {
+          await sink.close();
+        } catch (_) {}
+      }
+      http.close(force: true);
+    }
   }
 
   /// 发一次带信封的 `/file/read`，把响应**按字节**收下来（`DshClient` 那条路只给 String）。

@@ -98,12 +98,12 @@ class _SessionActionsSheetState extends State<_SessionActionsSheet> {
     final navigator = Navigator.of(context);
     setState(() => _localError = null);
     try {
-      final saved = await _controller.exportZip(widget.sessionId);
+      final saved = await _controller.exportZip(widget.sessionId, title: widget.title);
       final onChanged = widget.onChanged;
       if (onChanged != null) await onChanged();
       if (!mounted) return;
       navigator.pop();
-      messenger.showSnackBar(SnackBar(content: Text('已存到 $saved')));
+      messenger.showSnackBar(SnackBar(content: Text('已导出到 $saved')));
     } on SessionsAdminException {
       if (mounted) setState(() {});
     } catch (e) {
@@ -117,10 +117,10 @@ class _SessionActionsSheetState extends State<_SessionActionsSheet> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AidockColors.surface,
         title: const Text('删除这个会话？', style: TextStyle(fontSize: 16)),
-        content: const Text(
-          '手机上没法真删：这一下会把会话归档、从列表里移走，它还在跑的话会先停掉当前这一轮。\n'
-          '会话记录仍然留在电脑上，桌面端还可以把它捞回来。',
-          style: TextStyle(fontSize: 13, height: 1.6),
+        content: Text(
+          '这一下会把这轮会话的目录从电脑上整个删掉，删完不可恢复。\n'
+          '如果它还在跑，会先停掉当前这一轮。',
+          style: TextStyle(fontSize: 13, height: 1.6, color: AidockColors.textDim),
         ),
         actions: [
           TextButton(
@@ -137,7 +137,7 @@ class _SessionActionsSheetState extends State<_SessionActionsSheet> {
     if (go != true || !mounted) return;
     await _run(
       () => _controller.remove(widget.sessionId),
-      done: '已从列表移走（记录还在电脑上）',
+      done: '已从电脑上删掉',
     );
   }
 

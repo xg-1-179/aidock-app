@@ -53,6 +53,55 @@ class _ArtifactsPageState extends State<ArtifactsPage> {
     }
   }
 
+  /// 把清单里状态是 ok 的产物在电脑上现场打成一个 zip 再拉回来。
+  ///
+  /// 打包用的是宿主自己的 `/session/archive`：它只认「允许区里、这一条会话真的能读到」
+  /// 的路径，所以这里只送 `status == ok` 的那些，跟清单显示的口径一致。
+  Future<void> _downloadAll() async {
+    final client = widget.state.client;
+    final sessionId = widget.state.openSessionId;
+    if (client == null || sessionId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('先打开一条会话')));
+      return;
+    }
+    final paths = <String>[
+      for (final a in widget.state.artifacts)
+        if ('${a['status'] ?? ''}' == 'ok') '${a['path'] ?? ''}',
+    ].where((e) => e.isNotEmpty).toList(growable: false);
+    if (paths.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('没有可打包的文件')));
+      return;
+    }
+    setState(() {
+      _downloading = 'zip';
+      _progress = 0;
+    });
+    try {
+      final saved = await AIDockDownloader.downloadArchive(
+        client,
+        sessionId: sessionId,
+        paths: paths,
+        onProgress: (v) {
+          if (mounted) setState(() => _progress = v);
+        },
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已打包 ${paths.length} 份到 $saved')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _downloading = null;
+          _progress = null;
+        });
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -82,6 +131,21 @@ class _ArtifactsPageState extends State<ArtifactsPage> {
           appBar: AppBar(
             title: const Text('会话产物'),
             actions: [
+              IconButton(
+                tooltip: '打包成 zip 下载',
+                onPressed: _downloading == null ? _downloadAll : null,
+                icon: _downloading == 'zip'
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          value: _progress,
+                          color: AidockColors.accent,
+                        ),
+                      )
+                    : const Icon(Icons.folder_zip_outlined, size: 20),
+              ),
               IconButton(
                 tooltip: '刷新',
                 onPressed: s.loadingArtifacts ? null : () => s.loadArtifacts(),

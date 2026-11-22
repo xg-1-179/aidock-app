@@ -364,7 +364,13 @@ class _SessionsPageState extends State<SessionsPage> {
         sessionId: s.id,
         title: s.title,
         pinned: s.pinned,
-        onChanged: () => state.refreshSessions(),
+        onChanged: () async {
+          await state.refreshSessions();
+          // 删掉/归档的正好是当前打开的那条：本地也收摊，别留着一个已经不存在的会话在聊。
+          if (state.openSessionId == s.id && !state.sessions.any((e) => e.id == s.id)) {
+            state.closeSession();
+          }
+        },
       );
       return;
     }

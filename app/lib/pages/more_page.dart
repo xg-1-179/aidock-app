@@ -141,7 +141,7 @@ class _MorePageState extends State<MorePage> {
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => AboutPage(
-                      currentVersion: '0.18.1',
+                      currentVersion: '0.19.0',
                       onLogout: () => s.forgetSaved(),
                     ),
                   ),

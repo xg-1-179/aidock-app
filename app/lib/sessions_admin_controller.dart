@@ -1,4 +1,6 @@
 import 'package:dsh_link_protocol/dsh_link_protocol.dart';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 
 /// 会话管理员动作里能出错的唯一出口：`message` 已经是给人看的中文，
@@ -78,40 +80,105 @@ class SessionsAdminController extends ChangeNotifier {
   Future<void> archive(String sessionId) =>
       _guard<void>(() => _archiveSession(sessionId, stopActivity: false));
 
-  /// 「删除」：移动端能做到的最接近的一步 —— 归档，并把还在跑的那一轮停掉。
+  /// 「删除」：把这段会话在电脑上的目录整段删掉（`POST /link/session/purge`）。
   ///
-  /// 宿主没有删单条会话的接口，唯一的重活是 `workspace/clear-archived`
-  /// （清空全部已归档会话，且要 `confirm:true`），它不是「删这一条」，所以不在这里调。
-  Future<void> remove(String sessionId) =>
-      _guard<void>(() => _archiveSession(sessionId, stopActivity: true));
+  /// 宿主自己只有归档语义，这个路由是插件补的：删前先停掉还在跑的那一轮，
+  /// 再删 `~/.dsh/sessions/<项目>/<会话 id>` 整个目录，删完不可恢复。
+  Future<void> remove(String sessionId) => _guard<void>(() async {
+        try {
+          await _archiveSession(sessionId, stopActivity: true);
+        } catch (_) {
+          // 已经停掉或者本来就归档了：不影响后面的真删。
+        }
+        final body = await client.api(
+          'POST',
+          '/link/session/purge',
+          payload: <String, dynamic>{'sessionId': sessionId},
+        );
+        _ensureOk(body, '删除');
+      });
 
-  /// 导出整段会话为 zip。
+  /// 导出整段会话为 Markdown 文本，写到手机下载目录，返回落盘绝对路径。
   ///
-  /// 现阶段只能如实报错，不能伪造一个路径。卡点在传输层，不在业务层：
-  ///
-  /// * 宿主只有两条导出路由 —— `GET /session-log`（sessionId + includeDescendants）
-  ///   与 `POST /session/archive`（现场把勾选的文件打包）—— 两条都直接把
-  ///   `application/zip` 字节流写进响应体；
-  /// * App 这边的 [DshClient] 走 `IoDshTransport`，响应体是用
-  ///   `utf8.decoder.bind(res).join()` 收成 `String` 的
-  ///   （`packages/dsh_link_protocol/lib/src/client/transport.dart:86`），二进制一过就坏；
-  /// * `AIDockDownloader` 只吃「电脑上的文件路径」（内部固定打
-  ///   `/api/mobile/v1/file/read` 再按块解信封），没有「给我一条 URL 拿字节」的入口。
-  ///
-  /// 真接上需要一条按字节下载的通道，做法见下面的 TODO。
-  Future<String> exportZip(String sessionId) {
-    // TODO(session-export): 传输层能按字节收响应后，换成
-    //   GET /api/mobile/v1/session-log?sessionId=<id>&includeDescendants=true 取原始的
-    //   application/zip 响应（分块信封的 AAD 是 v2|down|file|<path>|<请求 nonce>|<块序号>，
-    //   密钥用 client.keys.down），再照宿主自己的命名存进
-    //   AIDockDownloader.downloadDirectory()，把落盘路径记进 _lastSavedPath 并 return 它。
-    final name = _suggestedZipName(sessionId);
-    return _guard<String>(() async {
-      throw SessionsAdminException(
-        '导出还没接上：电脑上的导出接口只回 zip 字节流，而这个 App 的下载通道只认电脑上的'
-        '文件路径，中间没有「按字节下载」这一环。补上之后，这里会直接存成 $name。',
-      );
-    });
+  /// 宿主的 `GET /session-log` 要 `apiProxy.downloads`，这一代 DSH 的兼容桥没这块
+  /// （实测 502）；`POST /session/archive` 只能打包「电脑上允许区里的文件」，装不下
+  /// 整段对话。所以这里改成本地渲染：把消息按页拉全，拼成 Markdown 再落盘 ——
+  /// 不依赖宿主的二进制通道，任何一代 DSH 都能用。
+  Future<String> exportZip(String sessionId, {String title = ''}) =>
+      _guard<String>(() async {
+        final rows = <Map<String, dynamic>>[];
+        int? before;
+        for (var page = 0; page < 12; page++) {
+          final batch = await client.messages(
+            sessionId,
+            limit: 100,
+            beforeSeq: before,
+            thin: false,
+          );
+          if (batch.isEmpty) break;
+          rows.insertAll(0, batch);
+          final first = batch.first['seq'];
+          final next = first is int ? first : null;
+          if (next == null || batch.length < 100) break;
+          before = next;
+        }
+        if (rows.isEmpty) {
+          throw SessionsAdminException('这段会话没有可导出的消息（可能是空的）');
+        }
+        final buf = StringBuffer()
+          ..writeln('# ${title.trim().isEmpty ? '会话' : title.trim()}')
+          ..writeln()
+          ..writeln('> `$sessionId` · 共 ${rows.length} 条')
+          ..writeln();
+        for (final row in rows) {
+          final text = _messageText(row).trim();
+          if (text.isEmpty) continue;
+          final role = '${row['role'] ?? 'user'}';
+          final who = role == 'assistant'
+              ? '助手'
+              : (role == 'user' || role == 'human' ? '我' : role);
+          final time = row['time'];
+          final ts = time is num
+              ? DateTime.fromMillisecondsSinceEpoch(time.toInt())
+                  .toLocal()
+                  .toString()
+                  .substring(0, 19)
+              : '';
+          buf
+            ..writeln('## $who${ts.isEmpty ? '' : ' · $ts'}')
+            ..writeln()
+            ..writeln(text)
+            ..writeln();
+        }
+        final dir = await downloadDirectory();
+        final file = File('${dir.path}${Platform.pathSeparator}${_suggestedMarkdownName(sessionId)}');
+        await file.writeAsString(buf.toString(), flush: true);
+        _lastSavedPath = file.path;
+        return file.path;
+      });
+
+  /// 一条消息的正文：优先 `text`，其次 `content` 里的 text 块。
+  static String _messageText(Map<String, dynamic> row) {
+    final text = row['text'];
+    if (text is String && text.trim().isNotEmpty) return text;
+    final content = row['content'];
+    if (content is String) return content;
+    if (content is List) {
+      final parts = <String>[];
+      for (final block in content) {
+        if (block is Map && '${block['type']}' == 'text') {
+          final t = block['text'];
+          if (t is String && t.isNotEmpty) parts.add(t);
+        }
+      }
+      return parts.join('\n');
+    }
+    return '';
+  }
+
+  static String _suggestedMarkdownName(String sessionId) {
+    final safe = sessionId.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    return 'dsh-session-${safe.isEmpty ? 'session' : safe}.md';
   }
 
   /// 宿主自己的导出文件名就是 `dsh-session-<会话 id>.zip`（mobile/session-log.js），
