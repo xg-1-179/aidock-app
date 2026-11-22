@@ -13,9 +13,17 @@ import 'package:flutter/foundation.dart';
 ///
 /// 写回包都带一份新的 `status`，本地就直接用它刷新，省一次往返。
 class GitWriteController extends ChangeNotifier {
-  GitWriteController(this.client);
+  GitWriteController(this.client, {this.workspaceId});
 
   final DshClient client;
+
+  /// git 那一组接口要 `workspaceId`（宿主按工作区定位仓库根）。为空时按「宿主默认」，
+  /// 但那多半会被 400 拒掉，所以页面构造时一定把当前工作区传进来。
+  final String? workspaceId;
+
+  String get _qs => workspaceId == null
+      ? ''
+      : '?workspaceId=${Uri.encodeQueryComponent(workspaceId!)}';
 
   Map<String, dynamic> _status = const <String, dynamic>{};
   bool _busy = false;
@@ -44,7 +52,7 @@ class GitWriteController extends ChangeNotifier {
 
   /// 重读 `GET /git/status`。
   Future<void> refreshStatus() => _run(() async {
-        _status = await client.api('GET', '/git/status');
+        _status = await client.api('GET', '/git/status', query: _qs);
       });
 
   /// 全部暂存（`git add -A`）。
@@ -52,7 +60,7 @@ class GitWriteController extends ChangeNotifier {
         final r = await client.api(
           'POST',
           '/git/stage',
-          payload: const <String, dynamic>{'all': true},
+          payload: <String, dynamic>{'all': true, if (workspaceId != null) 'workspaceId': workspaceId!},
         );
         _applyStatus(r);
       });
@@ -67,6 +75,7 @@ class GitWriteController extends ChangeNotifier {
         '/git/stage',
         payload: <String, dynamic>{
           'paths': <String>[target],
+          if (workspaceId != null) 'workspaceId': workspaceId!,
         },
       );
       _applyStatus(r);
@@ -83,6 +92,7 @@ class GitWriteController extends ChangeNotifier {
         '/git/unstage',
         payload: <String, dynamic>{
           'paths': <String>[target],
+          if (workspaceId != null) 'workspaceId': workspaceId!,
         },
       );
       _applyStatus(r);
@@ -107,13 +117,13 @@ class GitWriteController extends ChangeNotifier {
       final r = await client.api(
         'POST',
         '/git/commit',
-        payload: <String, dynamic>{'message': text},
+        payload: <String, dynamic>{'message': text, if (workspaceId != null) 'workspaceId': workspaceId!},
       );
       final short = '${r['shortHash'] ?? r['hash'] ?? ''}'.trim();
       _lastCommit = short.isEmpty ? null : short;
       // 提交已经成功了：接下来这次刷新失败不该把成功翻成失败。
       try {
-        _status = await client.api('GET', '/git/status');
+        _status = await client.api('GET', '/git/status', query: _qs);
       } on DshClientException catch (_) {
         // 留着提交前那份 status，页面滚回列表时还会再刷一次。
       }

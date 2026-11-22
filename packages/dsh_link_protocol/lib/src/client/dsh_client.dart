@@ -277,7 +277,13 @@ class DshClient {
     String query = '',
     Map<String, dynamic>? payload,
   }) {
-    final full = path.startsWith('/api/') ? path : '/api/mobile/v1$path';
+    // 一律走 `link/` 别名：插件热重载换不掉旧 handler（旧 handler 的凭据库不认识
+    // 新配对的设备，会回 401 e2ee-unknown-device），别名是新一代注册的，能正常鉴权。
+    final full = path.startsWith('/api/')
+        ? path
+        : (path.startsWith('/link/')
+            ? '$_prefix$path'
+            : '$_prefix/link$path');
     return call(method, full, query: query, payload: payload);
   }
 

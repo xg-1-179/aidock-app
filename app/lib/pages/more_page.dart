@@ -68,13 +68,16 @@ class _MorePageState extends State<MorePage> {
                       : () => Navigator.of(context).push(MaterialPageRoute<void>(
                             builder: (_) => ScheduleEditPage(
                               client: s.client!,
+                              sessionId: s.openSessionId,
                               onSaved: s.loadSchedules,
                             ),
                           )),
                 ),
               ])),
               if (s.schedules.isEmpty)
-                _hint(s.loadingSchedules ? '读取中…' : '还没有定时任务'),
+                _hint(s.loadingSchedules
+                    ? '读取中…'
+                    : (s.scheduleHint.isNotEmpty ? s.scheduleHint : '还没有定时任务')),
               for (final r in s.schedules) _scheduleRow(s, r),
               const SizedBox(height: 24),
               _section('会话与代码'),
@@ -138,7 +141,7 @@ class _MorePageState extends State<MorePage> {
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => AboutPage(
-                      currentVersion: '0.18.0',
+                      currentVersion: '0.18.1',
                       onLogout: () => s.forgetSaved(),
                     ),
                   ),

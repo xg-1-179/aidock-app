@@ -1630,6 +1630,24 @@ class AppState extends ChangeNotifier {
       sendImages([OutgoingImage(name: name, mediaType: mediaType, bytes: bytes)], text: text);
 
   /// 读当前会话的 Git 状态（工作区里的仓库）。只读：只看不改。
+  /// git 那一组接口要 `workspaceId`：优先用这条会话所在的，退化到第一份登记过的工作区。
+  String? gitWorkspaceId;
+
+  Future<String?> _gitWorkspaceId(DshClient c) async {
+    if (gitWorkspaceId != null && gitWorkspaceId!.isNotEmpty) return gitWorkspaceId;
+    if (workspaces.isEmpty) {
+      try {
+        await loadWorkspaces();
+      } catch (_) {
+        // 读不到就按空处理，下面会给出人话提示
+      }
+    }
+    if (workspaces.isEmpty) return null;
+    final first = workspaces.first;
+    final id = first['id'] ?? first['workspaceId'] ?? first['name'];
+    return id == null ? null : '$id';
+  }
+
   Future<void> loadGit() async {
     final c = _client;
     if (c == null) return;
@@ -1637,9 +1655,18 @@ class AppState extends ChangeNotifier {
     gitError = null;
     notifyListeners();
     try {
-      gitStatus = await c.api('GET', '/git/status');
+      final ws = await _gitWorkspaceId(c);
+      if (ws == null) {
+        gitStatus = null;
+        gitCommits = [];
+        gitError = '这条电脑还没登记工作区，先在桌面端打开一次会话';
+        return;
+      }
+      gitWorkspaceId = ws;
+      final qs = '?workspaceId=${Uri.encodeQueryComponent(ws)}';
+      gitStatus = await c.api('GET', '/git/status', query: qs);
       try {
-        final log = await c.api('GET', '/git/log', query: '?limit=20');
+        final log = await c.api('GET', '/git/log', query: '${qs}&limit=20');
         gitCommits = ((log['commits'] as List?) ?? const [])
             .whereType<Map>()
             .map((e) => Map<String, dynamic>.from(e))
@@ -1770,6 +1797,9 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// 定时任务区的提示（没有会话时说明为什么是空的）。
+  String scheduleHint = '';
+
   /// 定时任务清单（宿主侧「任务」与「定时会话」都在这里）。
   Future<void> loadSchedules() async {
     final c = _client;
@@ -1777,7 +1807,15 @@ class AppState extends ChangeNotifier {
     loadingSchedules = true;
     notifyListeners();
     try {
-      final j = await c.api('GET', '/schedule/list');
+      final sid = openSessionId;
+      if (sid == null) {
+        // 宿主这条接口按会话筛，没有 sessionId 直接 400：没进会话就如实说明，
+        // 不要拿一个空列表冒充「这台电脑没有定时任务」。
+        schedules.clear();
+        scheduleHint = '先打开一条会话，再回来看它的定时任务';
+        return;
+      }
+      final j = await c.api('GET', '/schedule/list', query: '?sessionId=${Uri.encodeQueryComponent(sid)}');
       schedules
         ..clear()
         ..addAll(((j['records'] as List?) ?? const [])

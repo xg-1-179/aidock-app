@@ -119,7 +119,7 @@ class _GitPageState extends State<GitPage> {
                   final c = s.client;
                   if (c == null) return;
                   Navigator.of(context).push(MaterialPageRoute<void>(
-                    builder: (_) => GitCommitPage(client: c, onDone: s.loadGit),
+                    builder: (_) => GitCommitPage(client: c, onDone: s.loadGit, workspaceId: s.gitWorkspaceId),
                   ));
                 },
               ),

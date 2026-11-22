@@ -8,9 +8,12 @@ import '../theme.dart';
 
 /// 暂存 + 提交。上面点文件就暂存，下面写一句提交信息再提交。
 class GitCommitPage extends StatefulWidget {
-  const GitCommitPage({super.key, required this.client, this.onDone});
+  const GitCommitPage({super.key, required this.client, this.workspaceId, this.onDone});
 
   final DshClient client;
+
+  /// 当前工作区（宿主按它定位仓库根，缺了会被 400 拒）。
+  final String? workspaceId;
 
   /// 提交成功后叫一声，调用方自己去刷新 Git 页。
   final VoidCallback? onDone;
@@ -27,7 +30,7 @@ class _GitCommitPageState extends State<GitCommitPage> {
   @override
   void initState() {
     super.initState();
-    _git = GitWriteController(widget.client);
+    _git = GitWriteController(widget.client, workspaceId: widget.workspaceId);
     _form = Listenable.merge(<Listenable>[_git, _message]);
     unawaited(_git.refreshStatus());
   }
