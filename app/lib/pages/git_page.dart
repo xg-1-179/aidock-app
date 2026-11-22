@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../app_state.dart';
 import '../theme.dart';
+import 'git_commit_page.dart';
 
 /// Git 面板（只读那一半）：改动清单 + 最近提交 + 单份 diff。
 ///
@@ -111,6 +112,17 @@ class _GitPageState extends State<GitPage> {
           appBar: AppBar(
             title: const Text('Git'),
             actions: [
+              IconButton(
+                tooltip: '暂存并提交',
+                icon: const Icon(Icons.upload_file_rounded, size: 20),
+                onPressed: () {
+                  final c = s.client;
+                  if (c == null) return;
+                  Navigator.of(context).push(MaterialPageRoute<void>(
+                    builder: (_) => GitCommitPage(client: c, onDone: s.loadGit),
+                  ));
+                },
+              ),
               IconButton(
                 tooltip: '刷新',
                 onPressed: s.loadingGit ? null : s.loadGit,

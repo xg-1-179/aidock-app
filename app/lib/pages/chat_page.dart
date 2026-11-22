@@ -10,6 +10,7 @@ import '../app_state.dart';
 import '../theme.dart';
 import '../widgets/image_viewer.dart';
 import '../widgets/message_body.dart';
+import 'commands_page.dart';
 import 'schedule_edit_page.dart';
 
 class ChatPage extends StatefulWidget {
@@ -393,6 +394,30 @@ class _ChatPageState extends State<ChatPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          InkWell(
+            onTap: () {
+              final c = widget.state.client;
+              final sid = widget.state.openSessionId;
+              if (c == null || sid == null) return;
+              Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => CommandsPage(
+                  client: c,
+                  sessionId: sid,
+                  onPick: (name) {
+                    _input.text = '/$name ';
+                    _input.selection = TextSelection.collapsed(offset: _input.text.length);
+                    setState(() => _slash = const []);
+                  },
+                ),
+              ));
+            },
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 9),
+              child: Text('全部命令…',
+                  style: TextStyle(fontSize: 12, color: AidockColors.textDim)),
+            ),
+          ),
+          const Divider(height: 1, color: AidockColors.line),
           for (final c in _slash)
             InkWell(
               onTap: () {

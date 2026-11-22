@@ -535,7 +535,7 @@ class PluginsController extends ChangeNotifier {
   String describeError(Object error) {
     if (error is DshClientException) {
       final status = error.status ?? 0;
-      if (status == 401) return '登录凭据过期，重新用六位码连一次';
+      if (status == 401) return '这台电脑还没加载新接口（重启一次 DSH），或者登录凭据过期了，重新用六位码连一次';
       if (status == 503) return '宿主没装插件能力';
       final text = error.message.trim();
       if (status == 403) {

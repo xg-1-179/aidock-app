@@ -1341,7 +1341,7 @@ class AppState extends ChangeNotifier {
     String sessionId,
     Map<int, List<String>> pending,
   ) async {
-    var budget = 8;
+    var budget = 24;
     for (final entry in pending.entries) {
       if (budget <= 0) return;
       if (entry.key >= messages.length) continue;
@@ -1508,10 +1508,32 @@ class AppState extends ChangeNotifier {
       bubble.failed = true;
       error = '发送失败：$e';
       logLine('send 失败：$e');
-      outbox.add(OutboxItem(sessionId: sid, text: text.trim(), at: DateTime.now().millisecondsSinceEpoch));
-      unawaited(_persistOutbox());
+      // 只有网络类失败才值得排进待发队列；401/400 这类重发一百次也不会好，
+      // 排进去只会让队列越积越长、还挡住后面真正能发的消息。
+      if (_worthRetrying(e)) {
+        outbox.add(OutboxItem(sessionId: sid, text: text.trim(), at: DateTime.now().millisecondsSinceEpoch));
+        unawaited(_persistOutbox());
+      }
       notifyListeners();
     }
+  }
+
+  /// 这次失败还值不值得等网络恢复后自动重发。
+  ///
+  /// 判据只有两类：压根没拿到响应（断网、超时、连接被掐），或者宿主自己 5xx。
+  /// 401/403 是凭据问题、400 是内容问题，都属于「再发一次也白搭」，不入队。
+  static bool _worthRetrying(Object e) {
+    if (e is DshClientException) {
+      final st = e.status;
+      if (st == null) return true;
+      return st >= 500;
+    }
+    final text = '$e';
+    return text.contains('SocketException') ||
+        text.contains('TimeoutException') ||
+        text.contains('Connection closed') ||
+        text.contains('连接被') ||
+        text.contains('Failed host lookup');
   }
 
   /// 重发一条失败的消息：把坏气泡摘掉再走一遍正常发送，避免列表里留两遍。
@@ -1861,25 +1883,34 @@ class AppState extends ChangeNotifier {
   Future<void> flushOutbox() async {
     final c = _client;
     if (c == null || outbox.isEmpty) return;
-    final pending = outbox.where((e) => e.sessionId == openSessionId).toList()
-      ..sort((a, b) => a.at.compareTo(b.at));
-    if (pending.isEmpty) return;
-    final still = <OutboxItem>[];
-    for (final item in pending) {
-      try {
-        await c.sendMessage(item.sessionId, item.text);
-        logLine('补发成功：${item.text.length} 字');
-      } catch (e) {
-        still.add(item);
-        logLine('补发失败：$e');
-        break;
+    // 按会话分组：以前只补「当前打开的那条会话」，别的会话积压的消息永远不会动。
+    final bySession = <String, List<OutboxItem>>{};
+    for (final item in outbox) {
+      bySession.putIfAbsent(item.sessionId, () => []).add(item);
+    }
+    final done = <OutboxItem>[];
+    for (final entry in bySession.entries) {
+      final list = entry.value..sort((a, b) => a.at.compareTo(b.at));
+      for (final item in list) {
+        try {
+          await c.sendMessage(item.sessionId, item.text);
+          done.add(item);
+          logLine('补发成功：${item.sessionId.substring(0, 8)} ${item.text.length} 字');
+        } catch (e) {
+          logLine('补发失败：$e');
+          // 一条失败就停这一组，保住顺序；其它会话继续试。
+          break;
+        }
       }
     }
-    outbox
-      ..removeWhere(pending.contains)
-      ..addAll(still);
+    if (done.isEmpty) return;
+    outbox.removeWhere(done.contains);
     await _persistOutbox();
     notifyListeners();
+    // 补发出去的消息本机没有气泡，补完把当前会话的历史拉一遍，免得看着像丢了。
+    if (openSessionId != null && done.any((e) => e.sessionId == openSessionId)) {
+      await _catchUp(c, openSessionId!);
+    }
   }
 
   Future<void> dropOutbox() async {

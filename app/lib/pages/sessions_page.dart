@@ -6,6 +6,7 @@ import '../theme.dart';
 import 'chat_page.dart';
 import 'more_page.dart';
 import 'search_page.dart';
+import 'session_actions_sheet.dart';
 
 class SessionsPage extends StatefulWidget {
   const SessionsPage({super.key, required this.state});
@@ -60,6 +61,48 @@ class _SessionsPageState extends State<SessionsPage> {
         .toList();
   }
 
+  /// 换一台电脑：把已配对过的机器列出来，点哪台就切过去。
+  ///
+  /// 切过去不动本地保存的凭据，所以来回切不需要重新扫码。
+  Future<void> _switchMachine(AppState state) async {
+    final picked = await showModalBottomSheet<SavedMachine>(
+      context: context,
+      backgroundColor: AidockColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 14, 16, 6),
+              child: Text('换一台电脑', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            ),
+            for (final m in state.machines)
+              ListTile(
+                dense: true,
+                leading: Icon(
+                  (state.hostLabel.isNotEmpty && m.host.contains(state.hostLabel)) ? Icons.check_circle : Icons.computer_outlined,
+                  size: 20,
+                  color: (state.hostLabel.isNotEmpty && m.host.contains(state.hostLabel)) ? AidockColors.ok : AidockColors.textDim,
+                ),
+                title: Text(m.host, style: const TextStyle(fontSize: 13.5)),
+                subtitle: Text(
+                  m.permissions.isEmpty ? '这台还没记权限' : '权限：${m.permissions}',
+                  style: const TextStyle(fontSize: 11, color: AidockColors.textDim),
+                ),
+                onTap: () => Navigator.pop(ctx, m),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (picked == null) return;
+    await state.reconnectSaved(picked);
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = widget.state;
@@ -77,9 +120,23 @@ class _SessionsPageState extends State<SessionsPage> {
             const Text('会话'),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(state.hostLabel,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, color: AidockColors.textDim)),
+              child: InkWell(
+                onTap: state.machines.length < 2 ? null : () => _switchMachine(state),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(state.hostLabel,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12, color: AidockColors.textDim)),
+                    ),
+                    if (state.machines.length > 1) ...[
+                      const SizedBox(width: 4),
+                      const Icon(Icons.swap_horiz_rounded, size: 14, color: AidockColors.textDim),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -283,11 +340,34 @@ class _SessionsPageState extends State<SessionsPage> {
               subtitle: Text(s.id, style: const TextStyle(fontSize: 11)),
               onTap: () => Navigator.of(ctx).pop('copy'),
             ),
+            ListTile(
+              leading: const Icon(Icons.more_horiz_rounded, size: 20),
+              title: const Text('更多操作…', style: TextStyle(fontSize: 14)),
+              subtitle: const Text('置顶、归档、导出、删除', style: TextStyle(fontSize: 11)),
+              onTap: () => Navigator.of(ctx).pop('more'),
+            ),
           ],
         ),
       ),
     );
     if (!mounted || action == null) return;
+    if (action == 'more') {
+      final client = state.client;
+      if (client == null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('还没连上电脑')));
+        return;
+      }
+      await showSessionActions(
+        context,
+        client: client,
+        sessionId: s.id,
+        title: s.title,
+        pinned: s.pinned,
+        onChanged: () => state.refreshSessions(),
+      );
+      return;
+    }
     if (action == 'fork') {
       final id = await state.forkSession(s.id);
       if (!mounted) return;
