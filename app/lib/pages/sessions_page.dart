@@ -259,6 +259,12 @@ class _SessionsPageState extends State<SessionsPage> {
               onTap: () => Navigator.of(ctx).pop('rename'),
             ),
             ListTile(
+              leading: const Icon(Icons.call_split_rounded, size: 20),
+              title: const Text('从这里分叉', style: TextStyle(fontSize: 14)),
+              subtitle: const Text('复制当前历史，开一条新会话', style: TextStyle(fontSize: 11)),
+              onTap: () => Navigator.of(ctx).pop('fork'),
+            ),
+            ListTile(
               leading: const Icon(Icons.copy_rounded, size: 20),
               title: const Text('复制会话 ID', style: TextStyle(fontSize: 14)),
               subtitle: Text(s.id, style: const TextStyle(fontSize: 11)),
@@ -269,6 +275,14 @@ class _SessionsPageState extends State<SessionsPage> {
       ),
     );
     if (!mounted || action == null) return;
+    if (action == 'fork') {
+      final id = await state.forkSession(s.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(id == null ? '分叉没成功，看看列表里有没有新会话' : '已分叉出新会话')),
+      );
+      return;
+    }
     if (action == 'copy') {
       await Clipboard.setData(ClipboardData(text: s.id));
       if (!mounted) return;

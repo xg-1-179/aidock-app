@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'app_state.dart';
 import 'deeplink.dart';
 import 'notify.dart';
+import 'pages/intro_page.dart';
 import 'pages/pair_page.dart';
 import 'pages/sessions_page.dart';
 import 'theme.dart';
@@ -19,6 +22,10 @@ class AidockApp extends StatefulWidget {
 class _AidockAppState extends State<AidockApp> with WidgetsBindingObserver {
   final AppState state = AppState();
 
+  /// 第一次打开时先给一页三步说明，看完写标记就不再出现。
+  static const String _kIntroSeen = 'aidock.introSeen';
+  bool? _showIntro;
+
   @override
   void initState() {
     super.initState();
@@ -28,6 +35,10 @@ class _AidockAppState extends State<AidockApp> with WidgetsBindingObserver {
     state.loadUiPrefs();
     // 通知权限：Android 13+ 会弹一次系统框；用户拒了也不影响其他功能。
     Notifier.ask();
+    SharedPreferences.getInstance().then((p) {
+      if (!mounted) return;
+      setState(() => _showIntro = p.getBool(_kIntroSeen) != true);
+    });
     // 通知点进来的那条会话（热启动走监听，冷启动走 initial）。
     DeepLink.listen((url) {
       final sid = DeepLink.sessionOf(url);
@@ -71,11 +82,19 @@ class _AidockAppState extends State<AidockApp> with WidgetsBindingObserver {
           child: child!,
         ),
       ),
-      home: AnimatedBuilder(
-        animation: state,
-        builder: (context, _) =>
-            state.paired ? SessionsPage(state: state) : PairPage(state: state),
-      ),
+      home: _showIntro == null
+          ? const Scaffold(body: Center(child: CircularProgressIndicator()))
+          : _showIntro!
+              ? IntroPage(onDone: () async {
+                  final p = await SharedPreferences.getInstance();
+                  await p.setBool(_kIntroSeen, true);
+                  if (mounted) setState(() => _showIntro = false);
+                })
+              : AnimatedBuilder(
+                  animation: state,
+                  builder: (context, _) =>
+                      state.paired ? SessionsPage(state: state) : PairPage(state: state),
+                ),
     );
   }
 }

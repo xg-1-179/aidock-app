@@ -43,6 +43,23 @@ class MainActivity : FlutterActivity() {{
                 else -> result.notImplemented()
             }}
         }}
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aidock/keepalive")
+            .setMethodCallHandler {{ call, result ->
+                when (call.method) {{
+                    "start" -> {{
+                        val text = call.argument<String>("text") ?: "已连接到电脑"
+                        val it = android.content.Intent(this, AidockService::class.java)
+                        it.putExtra("text", text)
+                        if (Build.VERSION.SDK_INT >= 26) startForegroundService(it) else startService(it)
+                        result.success(true)
+                    }}
+                    "stop" -> {{
+                        stopService(android.content.Intent(this, AidockService::class.java))
+                        result.success(true)
+                    }}
+                    else -> result.notImplemented()
+                }}
+            }}
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aidock/notify")
             .setMethodCallHandler {{ call, result ->
                 when (call.method) {{
@@ -121,6 +138,38 @@ class MainActivity : FlutterActivity() {{
         nm.notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt(), n)
     }}
 }}
+
+/**
+ * 前台服务：连上电脑后挂一条常驻通知，锁屏/切后台时系统不会急着把进程收掉。
+ * 只有一张低优先通知，不响不亮；断开连接时 App 会 stopService。
+ */
+class AidockService : android.app.Service() {{
+    override fun onBind(intent: android.content.Intent?): android.os.IBinder? = null
+
+    override fun onStartCommand(intent: android.content.Intent?, flags: Int, startId: Int): Int {{
+        val text = intent?.getStringExtra("text") ?: "已连接到电脑"
+        val nm = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
+        val builder: android.app.Notification.Builder = if (Build.VERSION.SDK_INT >= 26) {{
+            nm.createNotificationChannel(
+                android.app.NotificationChannel(
+                    "aidock.keepalive", "AIDock 连接", android.app.NotificationManager.IMPORTANCE_LOW
+                )
+            )
+            android.app.Notification.Builder(this, "aidock.keepalive")
+        }} else {{
+            @Suppress("DEPRECATION")
+            android.app.Notification.Builder(this)
+        }}
+        val n = builder
+            .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+            .setContentTitle("AIDock")
+            .setContentText(text)
+            .setOngoing(true)
+            .build()
+        startForeground(9, n)
+        return android.app.Service.START_STICKY
+    }}
+}}
 '''
 
 
@@ -142,6 +191,31 @@ def main() -> int:
 
     manifest = pathlib.Path("android/app/src/main/AndroidManifest.xml")
     s = manifest.read_text(encoding="utf-8")
+    if "android.permission.FOREGROUND_SERVICE" not in s:
+        s = s.replace(
+            "<application",
+            '<uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>\n'
+            '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>\n'
+            '    <application',
+            1,
+        )
+        manifest.write_text(s, encoding="utf-8")
+        s = manifest.read_text(encoding="utf-8")
+
+    if "AidockService" not in s:
+        s = s.replace(
+            "</application>",
+            '    <service\n'
+            '            android:name=".AidockService"\n'
+            '            android:foregroundServiceType="dataSync"\n'
+            '            android:exported="false" />\n'
+            '    </application>',
+            1,
+        )
+        manifest.write_text(s, encoding="utf-8")
+        s = manifest.read_text(encoding="utf-8")
+        print("keepalive service: .AidockService (dataSync)")
+
     if "android.permission.POST_NOTIFICATIONS" not in s:
         s = s.replace(
             "<application",

@@ -7,6 +7,7 @@ import 'package:dsh_link_protocol/dsh_link_protocol.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'keepalive.dart';
 import 'notify.dart';
 
 class ChatMessage {
@@ -15,10 +16,15 @@ class ChatMessage {
     required this.text,
     this.streaming = false,
     List<String>? images,
-  }) : images = images ?? <String>[];
+    List<String>? produced,
+  })  : images = images ?? <String>[],
+        produced = produced ?? <String>[];
   final String role;
   String text;
   bool streaming;
+
+  /// 这一轮产出的文件路径（历史里 `producedFiles` / `fileChanges` 收上来的）。
+  final List<String> produced;
 
   /// 这一条里带的图片（base64 原字节）；历史里按 `attachmentId` 现取，
   /// 取不到就是空列表，气泡里仍显示「（图片）」占位。
@@ -208,6 +214,16 @@ class AppState extends ChangeNotifier {
   bool loadingDevices = false;
   final List<Map<String, dynamic>> schedules = [];
   bool loadingSchedules = false;
+
+  // ---- Git 面板（只读那一半）----
+  Map<String, dynamic> gitStatus = const {};
+  List<Map<String, dynamic>> gitCommits = [];
+  bool loadingGit = false;
+  String? gitError;
+
+  // ---- 会话产物 ----
+  final List<Map<String, dynamic>> artifacts = [];
+  bool loadingArtifacts = false;
 
   // ---- 界面偏好：字号 ----
   static const String _kTextScale = 'aidock.textScale';
@@ -440,6 +456,8 @@ class AppState extends ChangeNotifier {
       instanceId = instance;
       hostLabel = '${base.host}:${base.port}';
       paired = true;
+      // 连上了就挂一条常驻通知，锁屏时不至于被系统直接收掉。
+      unawaited(KeepAlive.start('已连接 ${base.host}:${base.port}'));
       await refreshSessions();
       if (error != null) {
         throw StateError(error!);
@@ -549,6 +567,7 @@ class AppState extends ChangeNotifier {
       );
       _client = result.client;
       paired = true;
+      unawaited(KeepAlive.start('已连接 ${base.host}:${base.port}'));
       connectionKind = '${meta['transport'] ?? 'direct'}';
       // 存下来：下次开 App 不用再问一遍地址和六位码。
       await _rememberDevice(
@@ -758,6 +777,28 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// 从这条会话分叉出一条新会话（宿主会复制到当前轮次的历史）。
+  /// 分叉是非幂等写：只在用户明确点的时候调一次，不自动重试。
+  Future<String?> forkSession(String sessionId) async {
+    final c = _client;
+    if (c == null) return null;
+    busy = true;
+    notifyListeners();
+    try {
+      final out = await c.api('POST', '/session/fork', payload: {'sessionId': sessionId});
+      final id = '${out['sessionId'] ?? out['id'] ?? out['newSessionId'] ?? ''}';
+      await refreshSessions();
+      busy = false;
+      notifyListeners();
+      return id.isEmpty ? null : id;
+    } catch (e) {
+      busy = false;
+      error = '分叉失败：$e';
+      notifyListeners();
+      return null;
+    }
+  }
+
   Future<void> createSession({String? workspaceId}) async {
     final c = _client;
     if (c == null) return;
@@ -819,7 +860,11 @@ class AppState extends ChangeNotifier {
         final id = '${row['id'] ?? ''}';
         if (id.isNotEmpty) _seenIds.add(id);
         final mine = role == 'user' || role == 'human';
-        messages.add(ChatMessage(role: mine ? 'user' : 'assistant', text: text));
+        messages.add(ChatMessage(
+          role: mine ? 'user' : 'assistant',
+          text: text,
+          produced: _producedOf(row),
+        ));
         final ids = _attachmentIdsOf(row);
         if (ids.isNotEmpty) pending[messages.length - 1] = ids;
       }
@@ -1001,7 +1046,11 @@ class AppState extends ChangeNotifier {
         final dup = tail.any((x) => x.text == text && x.role == (mine ? 'user' : 'assistant'));
         if (dup) continue;
       }
-      messages.add(ChatMessage(role: mine ? 'user' : 'assistant', text: text));
+      messages.add(ChatMessage(
+        role: mine ? 'user' : 'assistant',
+        text: text,
+        produced: _producedOf(row),
+      ));
       added++;
     }
     if (added > 0) notifyListeners();
@@ -1241,6 +1290,28 @@ class AppState extends ChangeNotifier {
     return '回到 AIDock 看看结果';
   }
 
+  /// 从一行历史里收产物路径：`producedFiles` 可能是字符串数组或 `{path}` 数组，
+  /// `fileChanges` 里也有 `path`。两种都认，空的丢掉。
+  static List<String> _producedOf(Map<String, dynamic> row) {
+    final out = <String>[];
+    void take(Object? value) {
+      if (value is String) {
+        if (value.trim().isNotEmpty) out.add(value.trim());
+        return;
+      }
+      if (value is Map) {
+        final p = value['path'] ?? value['target'];
+        if (p is String && p.trim().isNotEmpty) out.add(p.trim());
+      }
+    }
+
+    final produced = row['producedFiles'];
+    if (produced is List) for (final e in produced) take(e);
+    final changes = row['fileChanges'];
+    if (changes is List) for (final e in changes) take(e);
+    return out;
+  }
+
   static String _textOfMessage(Map<String, dynamic> msg) {
     final blocks0 = msg['blocks'];
     final imageCount = blocks0 is List
@@ -1406,6 +1477,92 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// 读当前会话的 Git 状态（工作区里的仓库）。只读：只看不改。
+  Future<void> loadGit() async {
+    final c = _client;
+    if (c == null) return;
+    loadingGit = true;
+    gitError = null;
+    notifyListeners();
+    try {
+      gitStatus = await c.api('GET', '/git/status');
+      try {
+        final log = await c.api('GET', '/git/log', query: '?limit=20');
+        gitCommits = ((log['commits'] as List?) ?? const [])
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      } catch (e) {
+        gitCommits = [];
+        logLine('git log 失败：$e');
+      }
+      logLine('git status ok');
+    } catch (e) {
+      gitError = '$e';
+      logLine('git status 失败：$e');
+    } finally {
+      loadingGit = false;
+      notifyListeners();
+    }
+  }
+
+  /// 取一份 diff 文本（未暂存或某个提交）。
+  Future<String> gitDiff({String? path, bool staged = false, String? commit}) async {
+    final c = _client;
+    if (c == null) return '';
+    final q = StringBuffer('?');
+    if (path != null && path.isNotEmpty) q.write('path=${Uri.encodeQueryComponent(path)}&');
+    if (staged) q.write('staged=1&');
+    if (commit != null && commit.isNotEmpty) q.write('commit=$commit&');
+    try {
+      final j = await c.api('GET', '/git/diff', query: q.toString());
+      return '${j['patch'] ?? j['text'] ?? j['diff'] ?? ''}';
+    } catch (e) {
+      return '取不到这份 diff：$e';
+    }
+  }
+
+  /// 当前会话产出的文件清单（路径来自历史里的 `producedFiles`），再向宿主确认哪些还在。
+  Future<void> loadArtifacts([List<String>? paths]) async {
+    final c = _client;
+    final sid = openSessionId;
+    if (c == null || sid == null) return;
+    final list = (paths ?? _producedPaths()).toSet().toList();
+    loadingArtifacts = true;
+    notifyListeners();
+    try {
+      if (list.isEmpty) {
+        artifacts.clear();
+      } else {
+        final j = await c.api('POST', '/session/artifacts',
+            payload: {'sessionId': sid, 'paths': list});
+        artifacts
+          ..clear()
+          ..addAll(((j['items'] as List?) ?? const [])
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e)));
+      }
+      logLine('artifacts: ${artifacts.length}');
+    } catch (e) {
+      logLine('artifacts 失败：$e');
+      setError('读不到产物清单：$e');
+    } finally {
+      loadingArtifacts = false;
+      notifyListeners();
+    }
+  }
+
+  /// 历史里出现过的产物路径（`producedFiles` 与 `fileChanges` 两种都收）。
+  List<String> _producedPaths() {
+    final out = <String>[];
+    for (final m in messages) {
+      for (final p in m.produced) {
+        if (p.isNotEmpty) out.add(p);
+      }
+    }
+    return out;
+  }
+
   /// 载入本机界面偏好（字号）。启动时调一次。
   Future<void> loadUiPrefs() async {
     final p = await SharedPreferences.getInstance();
@@ -1512,6 +1669,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> disconnect() async {
+    unawaited(KeepAlive.stop());
     // 断开＝彻底收摊：流、看门狗、重连计时器、审批卡、重连标记全清，否则
     // 10 秒一次的心跳看门狗会在断开之后把旧客户端又拉起来。
     await _sub?.cancel();

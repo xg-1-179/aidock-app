@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 
 import '../app_state.dart';
 import '../theme.dart';
+import 'artifacts_page.dart';
+import 'git_page.dart';
 
 /// 「更多」页：设备管理、定时任务、界面字号、运行日志。
 ///
@@ -56,6 +58,25 @@ class _MorePageState extends State<MorePage> {
                 _hint(s.loadingSchedules ? '读取中…' : '还没有定时任务'),
               for (final r in s.schedules) _scheduleRow(s, r),
               const SizedBox(height: 24),
+              _section('会话与代码'),
+              _linkTile(
+                icon: Icons.commit,
+                title: 'Git 改动',
+                subtitle: '暂存 / 未暂存 / 冲突，以及最近提交',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => GitPage(state: s)),
+                ),
+              ),
+              _linkTile(
+                icon: Icons.folder_open,
+                title: '这条会话的产物',
+                subtitle: s.openSessionId == null ? '先打开一条会话再看' : '生成过、改动过的文件',
+                enabled: s.openSessionId != null,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => ArtifactsPage(state: s)),
+                ),
+              ),
+              const SizedBox(height: 24),
               _section('界面'),
               _textScaleTile(s),
               const SizedBox(height: 24),
@@ -95,6 +116,24 @@ class _MorePageState extends State<MorePage> {
           ),
         );
       },
+    );
+  }
+
+  Widget _linkTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    bool enabled = true,
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: enabled ? AidockColors.accent : AidockColors.textDim),
+      title: Text(title, style: TextStyle(color: enabled ? null : AidockColors.textDim)),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: AidockColors.textDim)),
+      trailing: const Icon(Icons.chevron_right, size: 20),
+      enabled: enabled,
+      onTap: enabled ? onTap : null,
     );
   }
 
